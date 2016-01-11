@@ -151,10 +151,8 @@ class SVD extends TrainingModel {
 			//if (ratings(u)(i) > 0){ //??
 				val eui = ratings(u)(i) - predict(u,i)
 
-				//!!
-				val bu = userDeviation(u)
-				userDeviation(u) += gamma * (eui * movieDeviation(i) - lambda * userDeviation(u))
-				movieDeviation(i) += gamma * (eui * bu - lambda * movieDeviation(i))
+				userDeviation(u) += gamma * (eui - lambda * userDeviation(u))
+				movieDeviation(i) += gamma * (eui - lambda * movieDeviation(i))
 				for(h <- 0 until f){
 					val puh = matrixP(u)(h)
 					matrixP(u)(h) += gamma * ( eui * matrixQ(h)(i) - lambda * matrixP(u)(h))
@@ -185,7 +183,7 @@ class SVD extends TrainingModel {
 
 	for(oneStep <- 1 to steps){				
 		println("Training step " + oneStep)
-		if( gradientDescent() < 0.001 )
+		if( math.abs(gradientDescent()) < 0.001 )
 			break
 	}
 
