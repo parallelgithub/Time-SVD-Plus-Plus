@@ -7,7 +7,7 @@ import scala.math
 
 		case class RatingDataStructure(userID: Int, movieID: Int, rating: Double, timestamp: Long)
 
-		val ratingFile = Source.fromFile("../GitHub/dataset/ml-100k/u.data")
+		val ratingFile = Source.fromFile("../dataset/ml-100k/u.data")
 			.getLines
 			.toList
 			.map{line =>
@@ -53,16 +53,16 @@ val ratings = Array(Array(5,3,0,1),
 
 val n = ratings.length
 val m = ratings(0).length
-val k = 50
+val f = 2
 
 
 abstract class TrainingModel {
 
-	protected val matrixP = Array.fill(n)(Array.fill[Double](k)(Random.nextDouble))
-	protected val matrixQ = Array.fill(k)(Array.fill[Double](m)(Random.nextDouble))
+	protected val matrixP = Array.fill(n)(Array.fill[Double](f)(Random.nextDouble))
+	protected val matrixQ = Array.fill(f)(Array.fill[Double](m)(Random.nextDouble))
 	protected def dotProduct(userIndex: Int, movieIndex: Int) = {
 		var sum = 0.0
-		for(h <- 0 until k) {
+		for(h <- 0 until f) {
 			sum = sum + matrixP(userIndex)(h) * matrixQ(h)(movieIndex)
 		}	
 		sum		
@@ -71,73 +71,6 @@ abstract class TrainingModel {
 	def predict(userIndex: Int, movieIndex: Int): Double 
 }
 
-//http://blog.csdn.net/zhaoxinfan/article/details/8821419
-//http://sifter.org/~simon/journal/20061211.html
-//"Matrix factorization techniques for recommender systems", 2009 
-class SVD extends TrainingModel {
-
-	val steps = 5000
-	//??
-	//(0.001, 0.02) (0.01, 0.05) (0.015, 0.015)
-	val (gamma, lambda) = (0.001, 0.02)
-
-	val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
-	//!! how to init
-	val userDeviation = Array.fill(n)(0.0)
-	val movieDeviation = Array.fill(m)(0.0)
-
-	def predict(userIndex: Int, movieIndex: Int) = { 
-		overallAverage + userDeviation(userIndex) + movieDeviation(movieIndex) + dotProduct(userIndex, movieIndex)
-
-	}
-
-	private def gradientDescent(): Double = {
-
-		
-
-		for(u <- 0 until n ; i <- 0 until m){
-			if (ratings(u)(i) > 0){ //??
-				val eui = ratings(u)(i) - predict(u,i)
-
-				//!!
-				val bu = userDeviation(u)
-				userDeviation(u) += gamma * (eui * movieDeviation(i) - lambda * userDeviation(u))
-				movieDeviation(i) += gamma * (eui * bu - lambda * movieDeviation(i))
-				for(h <- 0 until k){
-					val puh = matrixP(u)(h)
-					matrixP(u)(h) += gamma * ( eui * matrixQ(h)(i) - lambda * matrixP(u)(h))
-					matrixQ(h)(i) += gamma * ( eui * puh - lambda * matrixQ(h)(i))
-				}
-			}
-		}
-		
-		var error = 0.0
-		for(u <- 0 until n; i <- 0 until m){
-			if (ratings(u)(i) > 0){ //??
-				val tempDot = ratings(u)(i) - predict(u,i)
-				error = error + tempDot * tempDot
-
-				val bu2 = userDeviation(u) * userDeviation(u)
-				val bi2 = movieDeviation(i) * movieDeviation(i)
-				error = error + bu2 + bi2
-				for(h <- 0 until k){					
-					val pu2 = matrixP(u)(h)*matrixP(u)(h)
-					val qi2 = matrixQ(h)(i)*matrixQ(h)(i)
-					//!! parameter
-					error = error + (lambda/2.0) * ( pu2 + qi2 )
-				}
-			}
-		}
-		error  
-	}
-
-	for(oneStep <- 1 to steps){				
-		println("Training step " + oneStep)
-		if( gradientDescent() < 0.001 )
-			break
-	}
-
-}
 
 // matrix factorization
 // http://www.quuxlabs.com/blog/2010/09/matrix-factorization-a-simple-tutorial-and-implementation-in-python/
@@ -153,7 +86,7 @@ class MatrixFacotrization extends TrainingModel {
 		for(i <- 0 until n ; j <- 0 until m)
 			if (ratings(i)(j) > 0){
 				val eij = ratings(i)(j) - dotProduct(i,j)
-				for(h <- 0 until k){
+				for(h <- 0 until f){
 					val pih = matrixP(i)(h)
 					matrixP(i)(h) += alpha*(2 * eij * matrixQ(h)(j) - beta * matrixP(i)(h))
 					matrixQ(h)(j) += alpha*(2 * eij * pih - beta * matrixQ(h)(j))
@@ -166,7 +99,7 @@ class MatrixFacotrization extends TrainingModel {
 			if (ratings(i)(j) > 0){
 				val tempDot = ratings(i)(j) - dotProduct(i,j)
 				error = error + tempDot * tempDot
-				for(h <- 0 until k){
+				for(h <- 0 until f){
 					error = error + (beta/2.0) * (matrixP(i)(h)*matrixP(i)(h)+matrixQ(h)(j)*matrixQ(h)(j))
 				}
 			}
@@ -190,6 +123,73 @@ for(i <- 0 until n ) {
 }
 */
 
+//http://blog.csdn.net/zhaoxinfan/article/details/8821419
+//http://sifter.org/~simon/journal/20061211.html
+//"Matrix factorization techniques for recommender systems", 2009 
+class SVD extends TrainingModel {
+
+	val steps = 5000
+	//??
+	//(0.001, 0.02) (0.01, 0.05) (0.015, 0.015)
+	val (gamma, lambda) = (0.002, 0.02)
+
+	val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
+	//!! how to init
+	val userDeviation = Array.fill(n)(0.0)
+	val movieDeviation = Array.fill(m)(0.0)
+
+	def predict(userIndex: Int, movieIndex: Int) = { 
+		overallAverage + userDeviation(userIndex) + movieDeviation(movieIndex) + dotProduct(userIndex, movieIndex)
+
+	}
+
+	private def gradientDescent(): Double = {
+
+		
+
+		for(u <- 0 until n ; i <- 0 until m){
+			//if (ratings(u)(i) > 0){ //??
+				val eui = ratings(u)(i) - predict(u,i)
+
+				//!!
+				val bu = userDeviation(u)
+				userDeviation(u) += gamma * (eui * movieDeviation(i) - lambda * userDeviation(u))
+				movieDeviation(i) += gamma * (eui * bu - lambda * movieDeviation(i))
+				for(h <- 0 until f){
+					val puh = matrixP(u)(h)
+					matrixP(u)(h) += gamma * ( eui * matrixQ(h)(i) - lambda * matrixP(u)(h))
+					matrixQ(h)(i) += gamma * ( eui * puh - lambda * matrixQ(h)(i))
+				}
+			//}
+		}
+		
+		var error = 0.0
+		for(u <- 0 until n; i <- 0 until m){
+			//if (ratings(u)(i) > 0){ //??
+				val tempDot = ratings(u)(i) - predict(u,i)
+				error = error + tempDot * tempDot
+
+				val bu2 = userDeviation(u) * userDeviation(u)
+				val bi2 = movieDeviation(i) * movieDeviation(i)
+				error = error + bu2 + bi2
+				for(h <- 0 until f){					
+					val pu2 = matrixP(u)(h)*matrixP(u)(h)
+					val qi2 = matrixQ(h)(i)*matrixQ(h)(i)
+					//!! parameter
+					error = error + (lambda/2.0) * ( pu2 + qi2 )
+				}
+			//}
+		}
+		error  
+	}
+
+	for(oneStep <- 1 to steps){				
+		println("Training step " + oneStep)
+		if( gradientDescent() < 0.001 )
+			break
+	}
+
+}
 
 		var mae: Double = 0.0
 		var maeCount: Int = 0
@@ -239,6 +239,8 @@ k = 2 : 0.781
 (gamma, lambda) = (0.015, 0.015)
 k = 10 : 0.982
 (gamma, lambda) = (0.001, 0.02)
+k = 2 : 0.786
 k = 50 : 0.855
+
 
 */		
