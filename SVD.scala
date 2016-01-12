@@ -27,19 +27,40 @@ import scala.math
 		val ratings = Array.fill(numMovies)(Array.fill(numMovies)(0.0))
 		ratingFile.foreach{ x => ratings(x.userID - 1)(x.movieID - 1) =  x.rating }
 
-		val testStart = numUsers / 2
-		val testUsers = new Array[Int](numUsers - testStart)
-		val testMovies = new Array[Int](numUsers - testStart)
-		val testRatings = new Array[Double](numUsers - testStart)
-		for( index <- testStart until numUsers) {
-			val recentMovieID = ratingFile
-									.filter( _.userID - 1 == index ) 
-									.reduceLeft( (a,b) => if (a.timestamp > b.timestamp) a else b) 
-									.movieID 
-			testUsers(index - testStart) = index 
-			testMovies(index - testStart) = recentMovieID - 1
-			testRatings(index - testStart) = ratings(index)(recentMovieID - 1)
-			ratings(index)(recentMovieID - 1) = 0.0
+		//隨機從numUsers個users中挑出testSize個test users
+		val testSize = 100
+		val userCandidate = List.range(1, numUsers+1)
+		def generateTestUsers(candidate: List[Int],count: Int, n: Int): List[Int] = {
+			if(count == 0)
+				Nil
+			else{
+				val i = Random.nextInt(n)	
+				candidate(i) :: generateTestUsers((candidate.take(i) ::: candidate.drop(i+1)), count-1, n-1)
+			}
+		}
+		val testUsers = generateTestUsers(userCandidate, testSize, numUsers)
+
+		//val testStart = numUsers / 2
+		//val testUsers = new Array[Int](numUsers - testStart)
+		//val testMovies = new Array[Int](numUsers - testStart)
+		//val testRatings = new Array[Double](numUsers - testStart)
+		//val testData = new Array[RatingDataStructure](numUsers - testStart)
+		//for( index <- testStart until numUsers) {
+		val testData = testUsers.map{ id =>
+			val recent = ratingFile 
+			              .filter( _.userID == id ) 
+			              .reduceLeft( (a,b) => if (a.timestamp > b.timestamp) a else b)
+					
+			//testUsers(index - testStart) = index 
+			//testMovies(index - testStart) = recentMovieID - 1
+			//testRatings(index - testStart) = ratings(index)(recentMovieID - 1)
+			val actualRating = ratings(id - 1)(recent.movieID - 1)
+			ratings(id - 1)(recent.movieID - 1) = 0.0
+			//testData(index - testStart) = RatingDataStructure(id,
+			RatingDataStructure(id,
+				                                              recent.movieID,
+				                                              actualRating,
+				                                              recent.timestamp )
 		}
 
 
@@ -78,7 +99,7 @@ class MatrixFacotrization extends TrainingModel {
 
 	val steps = 5000
 	val alpha = 0.0002
-	val beta = 0.2		
+	val beta = 0.02		
 
 	def predict(userIndex: Int, movieIndex: Int) = dotProduct(userIndex, movieIndex)
 
@@ -103,6 +124,7 @@ class MatrixFacotrization extends TrainingModel {
 					error = error + (beta/2.0) * (matrixP(i)(h)*matrixP(i)(h)+matrixQ(h)(j)*matrixQ(h)(j))
 				}
 			}
+		//println("Error: " + error)
 		error  
 	}
 
@@ -128,7 +150,7 @@ for(i <- 0 until n ) {
 //"Matrix factorization techniques for recommender systems", 2009 
 class SVD extends TrainingModel {
 
-	val steps = 10000
+	val steps = 500
 	//??
 	//(0.001, 0.02) (0.01, 0.05) (0.015, 0.015)
 	val (gamma, lambda) = (0.002, 0.02)
@@ -179,12 +201,11 @@ class SVD extends TrainingModel {
 		error  
 	}
 
-	var min = 100.0
+	var min = math.abs(gradientDescent())
 	var step = 0
 	for(oneStep <- 1 to steps){				
-		println("Training step " + oneStep)
-		
 		val err = math.abs(gradientDescent())
+		println("Training step " + oneStep + " , error " + err)
 		if(err < min){
 			min = err
 			step = oneStep
@@ -208,12 +229,17 @@ class SVD extends TrainingModel {
 
 		//def test(model: TrainingModel): Double { -1.0 }
 
-		for( i <- testStart until numUsers) {
+		//for( i <- testStart until numUsers) {
+		for(test <- testData){
 			//testUsers(i - testStart) = i 
-			val movieIndex = testMovies(i - testStart)
-			val actualRating = testRatings(i - testStart)
+			//val movieIndex = testMovies(i - testStart)
+			//val actualRating = testRatings(i - testStart)
+			//val movieIndex = testData(i - testStart).movieID - 1 
+			val movieIndex = test.movieID - 1 
+			//val actualRating = testData(i - testStart).rating
+			val actualRating = test.rating
 			
-			val predictRating = matrix.predict(i, movieIndex)
+			val predictRating = matrix.predict(test.userID-1, movieIndex)
 			/*
 				value match {
 					case v if v < 1.0 => 1.0
@@ -222,6 +248,10 @@ class SVD extends TrainingModel {
 				}			
 				*/
 			println(actualRating + " " + predictRating)
+				println("User " + test.userID + " and movie " + test.movieID + " : ")
+				println(" Predic rating " + "%.3f".format(predictRating) )
+				println(" Actual rating " + test.rating)
+				println				
 			mae = mae + math.abs(actualRating - predictRating)
 			maeCount = maeCount + 1			
 		}
