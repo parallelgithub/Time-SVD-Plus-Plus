@@ -2,7 +2,7 @@
 
 import scala.io.Source
 import scala.util.Random
-import util.control.Breaks._
+//import util.control.Breaks._
 import scala.math
 
 		case class RatingDataStructure(userID: Int, movieID: Int, rating: Double, timestamp: Long)
@@ -28,7 +28,7 @@ import scala.math
 		ratingFile.foreach{ x => ratings(x.userID - 1)(x.movieID - 1) =  x.rating }
 
 		//隨機從numUsers個users中挑出testSize個test users
-		val testSize = 100
+		val testSize = 200
 		val userCandidate = List.range(1, numUsers+1)
 		def generateTestUsers(candidate: List[Int],count: Int, n: Int): List[Int] = {
 			if(count == 0)
@@ -38,29 +38,15 @@ import scala.math
 				candidate(i) :: generateTestUsers((candidate.take(i) ::: candidate.drop(i+1)), count-1, n-1)
 			}
 		}
-		val testUsers = generateTestUsers(userCandidate, testSize, numUsers)
-
-		//val testStart = numUsers / 2
-		//val testUsers = new Array[Int](numUsers - testStart)
-		//val testMovies = new Array[Int](numUsers - testStart)
-		//val testRatings = new Array[Double](numUsers - testStart)
-		//val testData = new Array[RatingDataStructure](numUsers - testStart)
-		//for( index <- testStart until numUsers) {
-		val testData = testUsers.map{ id =>
+		//儲存 test user 的資料，並將預計測試的電影在matrix重設為0
+		val testData = generateTestUsers(userCandidate, testSize, numUsers).map{ id =>
 			val recent = ratingFile 
 			              .filter( _.userID == id ) 
 			              .reduceLeft( (a,b) => if (a.timestamp > b.timestamp) a else b)
 					
-			//testUsers(index - testStart) = index 
-			//testMovies(index - testStart) = recentMovieID - 1
-			//testRatings(index - testStart) = ratings(index)(recentMovieID - 1)
 			val actualRating = ratings(id - 1)(recent.movieID - 1)
 			ratings(id - 1)(recent.movieID - 1) = 0.0
-			//testData(index - testStart) = RatingDataStructure(id,
-			RatingDataStructure(id,
-				                                              recent.movieID,
-				                                              actualRating,
-				                                              recent.timestamp )
+			RatingDataStructure(id, recent.movieID, actualRating, recent.timestamp )
 		}
 
 
@@ -129,8 +115,8 @@ class MatrixFacotrization extends TrainingModel {
 	}
 
 	for(oneStep <- 1 to steps){				
-		if( gradientDescent() < 0.001 )
-			break
+		gradientDescent()
+			
 	}
 
 }
@@ -150,7 +136,7 @@ for(i <- 0 until n ) {
 //"Matrix factorization techniques for recommender systems", 2009 
 class SVD extends TrainingModel {
 
-	val steps = 500
+	val steps = 50000
 	//??
 	//(0.001, 0.02) (0.01, 0.05) (0.015, 0.015)
 	val (gamma, lambda) = (0.002, 0.02)
@@ -193,7 +179,7 @@ class SVD extends TrainingModel {
 				for(h <- 0 until numFactors){					
 					val pu2 = matrixP(u)(h)*matrixP(u)(h)
 					val qi2 = matrixQ(h)(i)*matrixQ(h)(i)
-					//!! parameter
+					
 					error = error + (lambda/2.0) * ( pu2 + qi2 )
 				}
 			}
@@ -201,17 +187,100 @@ class SVD extends TrainingModel {
 		error  
 	}
 
-	var min = math.abs(gradientDescent())
-	var step = 0
-	for(oneStep <- 1 to steps){				
+	for(i <- 1 to 100) gradientDescent()
+
+	var last = math.abs(gradientDescent())
+	var loop = true
+	var i = 1
+	while(loop){
 		val err = math.abs(gradientDescent())
-		println("Training step " + oneStep + " , error " + err)
+		println("Training step " + i + " : error = " + err)
+		if(err > last)
+			loop = false
+		last = err
+		i += 1
+	}
+/*
+	var min = last
+	var step = 0
+	for(i <- 1 to steps){				
+		val err = math.abs(gradientDescent())
+		println("Training step " + i + " : error = " + err)
 		if(err < min){
 			min = err
-			step = oneStep
+			step = i
 		}
-		if( err < 0.001 )
-			break
+	}
+	println("min error : " + min + " at step " + step)
+*/
+}
+
+//https://github.com/guoguibing/librec/blob/master/librec/src/main/java/librec/rating/SVDPlusPlus.java
+//"Factorization meets the neighborhood- a multifaceted collaborative filtering model", 2008
+class SVDPlus extends TrainingModel {
+
+	val w = math.sqrt(numMovies)
+	val steps = 5000
+	//??
+	val (gamma, lambda) = (0.002, 0.02)
+
+	val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
+	//!! how to init
+	val userDeviation = Array.fill(numUsers)(0.0)
+	val movieDeviation = Array.fill(numMovies)(0.0)
+	val Y = Array.fill(numFactors)(Array.fill[Double](numMovies)(Random.nextGaussian() * 0.1))
+
+	def predict(userIndex: Int, movieIndex: Int) = { 
+
+		var value = 0.0
+		for(i <- 0 until numMovies)
+			for(f <- 0 until numFactors)
+				value += Y(f)(i) + matrixQ(f)(movieIndex)
+		overallAverage + userDeviation(userIndex) + movieDeviation(movieIndex) + dotProduct(userIndex, movieIndex) + value / w
+	}
+
+	private def gradientDescent(): Double = {
+
+		var error = 0.0
+
+		for(u <- 0 until numUsers ; i <- 0 until numMovies){
+
+			if (ratings(u)(i) > 0){ //??
+				val eui = ratings(u)(i) - predict(u,i)
+				error += eui * eui
+
+				userDeviation(u) += gamma * (eui - lambda * userDeviation(u))
+				movieDeviation(i) += gamma * (eui - lambda * movieDeviation(i))
+				error = error + userDeviation(u) * userDeviation(u) + movieDeviation(i) * movieDeviation(i)
+
+				val sumYj = Y.map{x => x.reduceLeft(_ + _) / w}
+				for(f <- 0 until numFactors){
+					val puh = matrixP(u)(f)
+					matrixP(u)(f) += gamma * ( eui * matrixQ(f)(i) - lambda * matrixP(u)(f))
+					matrixQ(f)(i) += gamma * ( eui * (puh + sumYj(f)) - lambda * matrixQ(f)(i))
+					//!! parameter
+					error += (lambda/2.0) * ( matrixP(u)(f)*matrixP(u)(f) + matrixQ(f)(i)*matrixQ(f)(i) )
+					for(j <- 0 until numMovies){
+						val yj = Y(f)(j)
+						Y(f)(j) += gamma * ( eui * matrixQ(f)(i) / w - lambda * yj)
+						error += (lambda/2.0) * yj * yj
+					}
+				}
+			}
+		}
+
+		error  
+	}
+
+	var min = math.abs(gradientDescent())
+	var step = 0
+	for(i <- 1 to steps){				
+		val err = math.abs(gradientDescent())
+		println("Training step " + i + " : error = " + err)
+		if(err < min){
+			min = err
+			step = i
+		}
 	}
 	println("min error : " + min + " at step " + step)
 
@@ -222,24 +291,20 @@ class SVD extends TrainingModel {
 
 		val select = 2
 		
+		//Training
 		val matrix = select match {
 			case 1 => new MatrixFacotrization
-			case 2 => new SVD
+			case 2 => new SVDPlus
 		}
 
 		//def test(model: TrainingModel): Double { -1.0 }
 
-		//for( i <- testStart until numUsers) {
+		//Test
 		for(test <- testData){
-			//testUsers(i - testStart) = i 
-			//val movieIndex = testMovies(i - testStart)
-			//val actualRating = testRatings(i - testStart)
-			//val movieIndex = testData(i - testStart).movieID - 1 
-			val movieIndex = test.movieID - 1 
-			//val actualRating = testData(i - testStart).rating
+
 			val actualRating = test.rating
 			
-			val predictRating = matrix.predict(test.userID-1, movieIndex)
+			val predictRating = matrix.predict(test.userID-1, test.movieID - 1)
 			/*
 				value match {
 					case v if v < 1.0 => 1.0
@@ -247,11 +312,12 @@ class SVD extends TrainingModel {
 					case _ => value
 				}			
 				*/
-			println(actualRating + " " + predictRating)
-				println("User " + test.userID + " and movie " + test.movieID + " : ")
-				println(" Predic rating " + "%.3f".format(predictRating) )
-				println(" Actual rating " + test.rating)
-				println				
+
+			println("User " + test.userID + " with movie " + test.movieID + " : ")
+			println(" Predic rating " + "%.3f".format(predictRating) )
+			println(" Actual rating " + test.rating)
+			println				
+
 			mae = mae + math.abs(actualRating - predictRating)
 			maeCount = maeCount + 1			
 		}
@@ -274,19 +340,14 @@ k = 5 : 0.762
 
 SVD
 (gamma, lambda) = (0.0002, 0.02)
-k = 2 : 0.755
-k = 3 : 0.784
-k = 10 : 0.835
-gamma, lambda = (0.01, 0.05)
-k = 2 : 0.781
-(gamma, lambda) = (0.015, 0.015)
-k = 10 : 0.982
-(gamma, lambda) = (0.001, 0.02)
-k = 2 : 0.786
-k = 50 : 0.855
+f = 2 : 0.667
 
-Step 500
+SVD step=until local minimal
 (gamma, lambda) = (0.002, 0.02)
-f = 2 : 0.748
-f = 3 : 0.755
+f = 20
+testSize = 200
+ MAE : 0.863 by 66892 steps in 7257.7 seconds 
+
+f = 2
+ MAE : 0.744 by 572 steps
 */		
