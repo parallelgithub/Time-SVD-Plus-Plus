@@ -173,6 +173,7 @@ class SVD extends TrainingModel {
 				val tempDot = ratings(u)(i) - predict(u,i)
 				error = error + tempDot * tempDot
 
+				//!! lambda
 				val bu2 = userDeviation(u) * userDeviation(u)
 				val bi2 = movieDeviation(i) * movieDeviation(i)
 				error = error + bu2 + bi2
@@ -216,30 +217,58 @@ class SVD extends TrainingModel {
 }
 
 //https://github.com/guoguibing/librec/blob/master/librec/src/main/java/librec/rating/SVDPlusPlus.java
+//https://www.quora.com/Whats-the-difference-between-SVD-and-SVD++
 //"Factorization meets the neighborhood- a multifaceted collaborative filtering model", 2008
 class SVDPlus extends TrainingModel {
 
-	val w = math.sqrt(numMovies)
-	val steps = 5000
 	//??
-	val (gamma, lambda) = (0.002, 0.02)
+	val nFB = 20 
+	val w = math.sqrt(numMovies)
+
+	val steps = 5000
+	val (gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
 
 	val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
 	//!! how to init
 	val userDeviation = Array.fill(numUsers)(0.0)
 	val movieDeviation = Array.fill(numMovies)(0.0)
-	val Y = Array.fill(numFactors)(Array.fill[Double](numMovies)(Random.nextGaussian() * 0.1))
+	//??
+	val feedback = Array.fill(numFactors)(Array.fill[Double](nFB)(Random.nextGaussian() * 0.1))
 
 	def predict(userIndex: Int, movieIndex: Int) = { 
 
 		var value = 0.0
-		for(i <- 0 until numMovies)
+		//??
+		for(i <- 0 until nFB)
 			for(f <- 0 until numFactors)
-				value += Y(f)(i) + matrixQ(f)(movieIndex)
-		overallAverage + userDeviation(userIndex) + movieDeviation(movieIndex) + dotProduct(userIndex, movieIndex) + value / w
+				value += feedback(f)(i) + matrixQ(f)(movieIndex)
+
+		overallAverage + 
+		  userDeviation(userIndex) + movieDeviation(movieIndex) + 
+		  dotProduct(userIndex, movieIndex) + value / w
 	}
 
 	private def gradientDescent(): Double = {
+
+		for(u <- 0 until numUsers ; i <- 0 until numMovies){
+
+			if (ratings(u)(i) > 0){ //??
+				val eui = ratings(u)(i) - predict(u,i)
+
+				userDeviation(u) += gamma * (eui - lambda1 * userDeviation(u))
+				movieDeviation(i) += gamma * (eui - lambda1 * movieDeviation(i))
+
+				val sumFBj = feedback.map{x => x.reduceLeft(_ + _) / w}
+				for(f <- 0 until numFactors){
+					val puf = matrixP(u)(f)
+					matrixP(u)(f) += gamma * ( eui * matrixQ(f)(i) - lambda2 * matrixP(u)(f))
+					matrixQ(f)(i) += gamma * ( eui * (puf + sumFBj(f)) - lambda2 * matrixQ(f)(i))
+					for(j <- 0 until nFB){
+						feedback(f)(j) += gamma * ( eui * matrixQ(f)(i) / w - lambda2 * feedback(f)(j))
+					}
+				}
+			}
+		}
 
 		var error = 0.0
 
@@ -247,23 +276,16 @@ class SVDPlus extends TrainingModel {
 
 			if (ratings(u)(i) > 0){ //??
 				val eui = ratings(u)(i) - predict(u,i)
-				error += eui * eui
+				val bu = userDeviation(u)
+				val bi = movieDeviation(i)
+				error += eui * eui + (lambda1/2.0) * ( bu * bu + bi * bi )
 
-				userDeviation(u) += gamma * (eui - lambda * userDeviation(u))
-				movieDeviation(i) += gamma * (eui - lambda * movieDeviation(i))
-				error = error + userDeviation(u) * userDeviation(u) + movieDeviation(i) * movieDeviation(i)
-
-				val sumYj = Y.map{x => x.reduceLeft(_ + _) / w}
 				for(f <- 0 until numFactors){
-					val puh = matrixP(u)(f)
-					matrixP(u)(f) += gamma * ( eui * matrixQ(f)(i) - lambda * matrixP(u)(f))
-					matrixQ(f)(i) += gamma * ( eui * (puh + sumYj(f)) - lambda * matrixQ(f)(i))
 					//!! parameter
-					error += (lambda/2.0) * ( matrixP(u)(f)*matrixP(u)(f) + matrixQ(f)(i)*matrixQ(f)(i) )
-					for(j <- 0 until numMovies){
-						val yj = Y(f)(j)
-						Y(f)(j) += gamma * ( eui * matrixQ(f)(i) / w - lambda * yj)
-						error += (lambda/2.0) * yj * yj
+					error += (lambda2/2.0) * ( matrixP(u)(f)*matrixP(u)(f) + matrixQ(f)(i)*matrixQ(f)(i) )
+					for(j <- 0 until nFB){
+						//?? new or old
+						error += (lambda2/2.0) * feedback(f)(j) * feedback(f)(j)
 					}
 				}
 			}
@@ -271,7 +293,7 @@ class SVDPlus extends TrainingModel {
 
 		error  
 	}
-
+/*
 	var min = math.abs(gradientDescent())
 	var step = 0
 	for(i <- 1 to steps){				
@@ -283,18 +305,32 @@ class SVDPlus extends TrainingModel {
 		}
 	}
 	println("min error : " + min + " at step " + step)
+*/
 
+
+	var last = math.abs(gradientDescent())
+	var loop = true
+	var i = 1
+	while(loop){
+		val err = math.abs(gradientDescent())
+		println("Training step " + i + " : error = " + err)
+		if(err > last)
+			loop = false
+		last = err
+		i += 1
+	}
 }
 
 		var mae: Double = 0.0
 		var maeCount: Int = 0
 
-		val select = 2
+		val select = 3
 		
 		//Training
 		val matrix = select match {
 			case 1 => new MatrixFacotrization
-			case 2 => new SVDPlus
+			case 2 => new SVD
+			case 3 => new SVDPlus
 		}
 
 		//def test(model: TrainingModel): Double { -1.0 }
@@ -344,10 +380,20 @@ f = 2 : 0.667
 
 SVD step=until local minimal
 (gamma, lambda) = (0.002, 0.02)
-f = 20
 testSize = 200
+f = 20
  MAE : 0.863 by 66892 steps in 7257.7 seconds 
-
 f = 2
- MAE : 0.744 by 572 steps
+ MAE : 0.707 by 530 steps
+
+SVD++
+(gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
+nFB = 20
+w : numMovies
+ 0.766 
+
+nFB = 2
+(gamma, lambda1, lambda2) = (0.00007, 0.00005, 0.00015)
+w: nFB
+ 0.738
 */		
