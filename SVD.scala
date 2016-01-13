@@ -23,9 +23,9 @@ import scala.math
 		                 .reduceLeft( (a,b) => if (a.movieID > b.movieID) a else b) 
 		                 .movieID				
 		//number of factors in matrix factorization
-		val numFactors = 2
+		val numFactors = 10
 
-		val ratings = Array.fill(numMovies)(Array.fill(numMovies)(0.0))
+		val ratings = Array.fill(numUsers)(Array.fill(numMovies)(0.0))
 		ratingFile.foreach{ x => ratings(x.userID - 1)(x.movieID - 1) =  x.rating }
 
 		//隨機從numUsers個users中挑出testSize個test users
@@ -85,7 +85,7 @@ abstract class TrainingModel {
 // http://www.quuxlabs.com/blog/2010/09/matrix-factorization-a-simple-tutorial-and-implementation-in-python/
 class MatrixFacotrization extends TrainingModel {
 
-	val steps = 5000
+	val steps = 500
 	val alpha = 0.0002
 	val beta = 0.02		
 
@@ -138,7 +138,7 @@ for(i <- 0 until n ) {
 //"Matrix factorization techniques for recommender systems", 2009 
 class SVD extends TrainingModel {
 
-	val steps = 50000
+	val steps = 500
 	//??
 	//(0.001, 0.02) (0.01, 0.05) (0.015, 0.015)
 	val (gamma, lambda) = (0.002, 0.02)
@@ -224,7 +224,8 @@ class SVD extends TrainingModel {
 class SVDPlus extends TrainingModel {
 
 	val nFB = numMovies 
-	val w = numMovies
+	//val w = numMovies
+	def w(value: Double): Double = value * 1000.0
 
 	val steps = 5
 	val (gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
@@ -240,20 +241,20 @@ class SVDPlus extends TrainingModel {
 		                        for(i <- 0 until s if x(i) > 0.0) 
 		                        	yield i 
 		                        }
+	//ratedMovieOfUsers.foreach{ x=> println(x) }
 
 	def predict(userIndex: Int, movieIndex: Int) = { 
 
 		var value = 0.0
 
-		//for(j <- 0 until nFB)
 		for(j <- ratedMovieOfUsers(userIndex))
 			for(f <- 0 until numFactors)
 				value += feedback(f)(j) + matrixQ(f)(movieIndex)
 
-		//mui + bu + bi + qi*[pu + sum(yj)]
+		//mui + bu + bi + qi*[pu + sum(yj)]		
 		overallAverage + 
 		  userDeviation(userIndex) + movieDeviation(movieIndex) + 
-		  dotProduct(userIndex, movieIndex) + value / w
+		  dotProduct(userIndex, movieIndex) + value / w(ratedMovieOfUsers(userIndex).size)
 	}
 
 	private def gradientDescent(): Double = {
@@ -268,7 +269,7 @@ class SVDPlus extends TrainingModel {
 				userDeviation(u) += gamma * (eui - lambda1 * userDeviation(u))
 				movieDeviation(i) += gamma * (eui - lambda1 * movieDeviation(i))
 
-				val sumFBj = feedback.map{x => x.reduceLeft(_ + _) / w}
+				val sumFBj = feedback.map{x => x.reduceLeft(_ + _) / w(ratedMovieOfUsers(u).size)}
 				
 				for(f <- 0 until numFactors){
 					val puf = matrixP(u)(f)
@@ -276,10 +277,9 @@ class SVDPlus extends TrainingModel {
 					matrixP(u)(f) += gamma * ( eui * matrixQ(f)(i) - lambda2 * matrixP(u)(f))
 					matrixQ(f)(i) += gamma * ( eui * (puf + sumFBj(f)) - lambda2 * matrixQ(f)(i))
 					
-					//update yj
-					//for(j <- 0 until nFB)
+					//update yj					
 					for(j <- ratedMovieOfUsers(u))
-						feedback(f)(j) += gamma * ( eui * matrixQ(f)(i) / w - lambda2 * feedback(f)(j))
+						feedback(f)(j) += gamma * ( eui * matrixQ(f)(i) / w(ratedMovieOfUsers(u).size) - lambda2 * feedback(f)(j))
 					
 				}
 			}
@@ -299,7 +299,6 @@ class SVDPlus extends TrainingModel {
 				for(f <- 0 until numFactors){
 					//!! parameter
 					error += (lambda2/2.0) * ( matrixP(u)(f)*matrixP(u)(f) + matrixQ(f)(i)*matrixQ(f)(i) )
-					//for(j <- 0 until nFB)
 					for(j <- ratedMovieOfUsers(u))	
 						error += (lambda2/2.0) * feedback(f)(j) * feedback(f)(j)
 					
@@ -421,4 +420,6 @@ w: nFB
  0.738
 
 nFB用原來的定義 i.e. nFB=numMovies 
+w = numMovies 
+ 0.745 15 steps
 */		
