@@ -22,6 +22,7 @@ import scala.math
 		val numMovies = ratingFile 
 		                 .reduceLeft( (a,b) => if (a.movieID > b.movieID) a else b) 
 		                 .movieID				
+		//number of factors in matrix factorization
 		val numFactors = 2
 
 		val ratings = Array.fill(numMovies)(Array.fill(numMovies)(0.0))
@@ -63,6 +64,7 @@ val m = ratings(0).length
 val f = 3
 */
 
+//
 abstract class TrainingModel {
 
 	protected val matrixP = Array.fill(numUsers)(Array.fill[Double](numFactors)(Random.nextDouble))
@@ -221,28 +223,34 @@ class SVD extends TrainingModel {
 //"Factorization meets the neighborhood- a multifaceted collaborative filtering model", 2008
 class SVDPlus extends TrainingModel {
 
-	//??
-	val nFB = 20 
-	val w = math.sqrt(numMovies)
+	val nFB = numMovies 
+	val w = numMovies
 
-	val steps = 5000
+	val steps = 5
 	val (gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
 
 	val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
 	//!! how to init
 	val userDeviation = Array.fill(numUsers)(0.0)
 	val movieDeviation = Array.fill(numMovies)(0.0)
-	//??
+	//According LibRec, initial by Gaussian distribution with mean 0.0 and standard deviation 1.0
 	val feedback = Array.fill(numFactors)(Array.fill[Double](nFB)(Random.nextGaussian() * 0.1))
+	val ratedMovieOfUsers = ratings.map{ x => 
+		                        val s = x.size 
+		                        for(i <- 0 until s if x(i) > 0.0) 
+		                        	yield i 
+		                        }
 
 	def predict(userIndex: Int, movieIndex: Int) = { 
 
 		var value = 0.0
-		//??
-		for(i <- 0 until nFB)
-			for(f <- 0 until numFactors)
-				value += feedback(f)(i) + matrixQ(f)(movieIndex)
 
+		//for(j <- 0 until nFB)
+		for(j <- ratedMovieOfUsers(userIndex))
+			for(f <- 0 until numFactors)
+				value += feedback(f)(j) + matrixQ(f)(movieIndex)
+
+		//mui + bu + bi + qi*[pu + sum(yj)]
 		overallAverage + 
 		  userDeviation(userIndex) + movieDeviation(movieIndex) + 
 		  dotProduct(userIndex, movieIndex) + value / w
@@ -250,28 +258,36 @@ class SVDPlus extends TrainingModel {
 
 	private def gradientDescent(): Double = {
 
+		//update each factor
 		for(u <- 0 until numUsers ; i <- 0 until numMovies){
 
 			if (ratings(u)(i) > 0){ //??
 				val eui = ratings(u)(i) - predict(u,i)
 
+				//update bu and bi
 				userDeviation(u) += gamma * (eui - lambda1 * userDeviation(u))
 				movieDeviation(i) += gamma * (eui - lambda1 * movieDeviation(i))
 
 				val sumFBj = feedback.map{x => x.reduceLeft(_ + _) / w}
+				
 				for(f <- 0 until numFactors){
 					val puf = matrixP(u)(f)
+					//update pu and qi
 					matrixP(u)(f) += gamma * ( eui * matrixQ(f)(i) - lambda2 * matrixP(u)(f))
 					matrixQ(f)(i) += gamma * ( eui * (puf + sumFBj(f)) - lambda2 * matrixQ(f)(i))
-					for(j <- 0 until nFB){
+					
+					//update yj
+					//for(j <- 0 until nFB)
+					for(j <- ratedMovieOfUsers(u))
 						feedback(f)(j) += gamma * ( eui * matrixQ(f)(i) / w - lambda2 * feedback(f)(j))
-					}
+					
 				}
 			}
 		}
 
 		var error = 0.0
 
+		//comput error
 		for(u <- 0 until numUsers ; i <- 0 until numMovies){
 
 			if (ratings(u)(i) > 0){ //??
@@ -283,17 +299,17 @@ class SVDPlus extends TrainingModel {
 				for(f <- 0 until numFactors){
 					//!! parameter
 					error += (lambda2/2.0) * ( matrixP(u)(f)*matrixP(u)(f) + matrixQ(f)(i)*matrixQ(f)(i) )
-					for(j <- 0 until nFB){
-						//?? new or old
+					//for(j <- 0 until nFB)
+					for(j <- ratedMovieOfUsers(u))	
 						error += (lambda2/2.0) * feedback(f)(j) * feedback(f)(j)
-					}
+					
 				}
 			}
-		}
+		} //end of for(u;i)
 
 		error  
-	}
-/*
+	} //end of def gradientDescent()
+
 	var min = math.abs(gradientDescent())
 	var step = 0
 	for(i <- 1 to steps){				
@@ -305,9 +321,8 @@ class SVDPlus extends TrainingModel {
 		}
 	}
 	println("min error : " + min + " at step " + step)
-*/
 
-
+/*
 	var last = math.abs(gradientDescent())
 	var loop = true
 	var i = 1
@@ -319,6 +334,7 @@ class SVDPlus extends TrainingModel {
 		last = err
 		i += 1
 	}
+*/	
 }
 
 		var mae: Double = 0.0
@@ -387,13 +403,22 @@ f = 2
  MAE : 0.707 by 530 steps
 
 SVD++
+
+nFB(number of yj)用未知的定義，包含for(i <- 0 until nFB)的用法
+
 (gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
-nFB = 20
 w : numMovies
- 0.766 
+nFB = 20
+ 0.766 5000 steps
+ 0.851 32740 step - 14735.7 seconds
+nFB = 2
+ 0.755 5000 steps
+ 0.834 19917 steps (因此不是train越多越好)
 
 nFB = 2
 (gamma, lambda1, lambda2) = (0.00007, 0.00005, 0.00015)
 w: nFB
  0.738
+
+nFB用原來的定義 i.e. nFB=numMovies 
 */		
