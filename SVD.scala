@@ -7,13 +7,14 @@ import java.util.concurrent.TimeUnit
 
 		case class RatingDataStructure(userID: Int, movieID: Int, rating: Double, timestamp: Long)
 
-		//val ratingFile = Source.fromFile("../dataset/ml-100k/u.data")
-		val ratingFile = Source.fromFile("../dataset/ml-1m/ratings.dat")
+		val filePath = "../dataset/ml-100k/u.data"
+		val ratingFile = Source.fromFile(filePath)
+		//val ratingFile = Source.fromFile("../dataset/ml-1m/ratings.dat")
 			.getLines
 			.toList
 			.map{line =>
-				//val fields = line.split("\t")
-				val fields = line.split("::")
+				val fields = line.split("\t")
+				//val fields = line.split("::")
 				val tempRating = RatingDataStructure(fields(0).toInt, fields(1).toInt, fields(2).toDouble, fields(3).toLong)
 				tempRating
 				}
@@ -24,7 +25,7 @@ import java.util.concurrent.TimeUnit
 		                 .reduceLeft( (a,b) => if (a.movieID > b.movieID) a else b) 
 		                 .movieID				
 		//number of factors in matrix factorization
-		val numFactors = 2
+		val numFactors = 10
 
 		val ratings = Array.fill(numUsers)(Array.fill(numMovies)(0.0))
 		ratingFile.foreach{ x => ratings(x.userID - 1)(x.movieID - 1) =  x.rating }
@@ -140,14 +141,25 @@ for(i <- 0 until n ) {
 //"Matrix factorization techniques for recommender systems", 2009 
 class SVD extends TrainingModel {
 
-	val steps = 500
+	val steps = 1000
 
 	val (gamma, lambda) = (0.002, 0.02)
 	//(0.001, 0.02) 
 	//(0.01, 0.05) http://blog.csdn.net/zhaoxinfan/article/details/8821419
 	//(0.015, 0.015) 2008 (SVD) A Guide to Singular Value Decomposition for Collaborative Filtering
 
-	val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
+	//val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
+	val overallAverage = {
+		var count = 0
+		var sum = 0.0
+		for(u <- 0 until numUsers ; i <- 0 until numMovies)
+			if(ratings(u)(i) > 0.0){
+				sum += ratings(u)(i)
+				count += 1
+			}
+		sum / count
+	}
+
 	//!! how to init
 	val userDeviation = Array.fill(numUsers)(0.0)
 	val movieDeviation = Array.fill(numMovies)(0.0)
@@ -193,7 +205,7 @@ class SVD extends TrainingModel {
 		}
 		error  
 	}
-
+/*
 	for(i <- 1 to 100) gradientDescent()
 	var last = math.abs(gradientDescent())
 	var loop = true
@@ -206,7 +218,7 @@ class SVD extends TrainingModel {
 		last = err
 		i += 1
 	}
-/*
+*/
 	var min = math.abs(gradientDescent())
 	var step = 0
 	for(i <- 1 to steps){				
@@ -218,7 +230,7 @@ class SVD extends TrainingModel {
 		}
 	}
 	println("min error : " + min + " at step " + step)
-*/
+
 }
 
 //https://github.com/guoguibing/librec/blob/master/librec/src/main/java/librec/rating/SVDPlusPlus.java
@@ -229,11 +241,22 @@ class SVDPlus extends TrainingModel {
 	val nFB = numMovies 
 	def w(value: Double): Double = value * 1000.0
 
-	val steps = 100
+	val steps = 15
 	val (gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
 	//(0.007, 0.005, 0.015) "Factorization meets the neighborhood- a multifaceted collaborative filtering model"
 
-	val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
+	//val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
+	val overallAverage = {
+		var count = 0
+		var sum = 0.0
+		for(u <- 0 until numUsers ; i <- 0 until numMovies)
+			if(ratings(u)(i) > 0.0){
+				sum += ratings(u)(i)
+				count += 1
+			}
+		sum / count
+	}
+
 	//!! how to init
 	val userDeviation = Array.fill(numUsers)(0.0)
 	val movieDeviation = Array.fill(numMovies)(0.0)
@@ -362,17 +385,37 @@ class TimeSVD extends TrainingModel {
 	//For the rating(u)(i) which we want to predict, its timestamp is preserved
 	ratingFile.foreach{ x => times(x.userID - 1)(x.movieID - 1) =  x.timestamp }
 	val userMeanDate = Array.tabulate(ratedMovieOfUsers.size) { u =>
-		val sum = ratedMovieOfUsers(u)
+		val sum: Double = ratedMovieOfUsers(u)
 		            .map{ i => days(times(u)(i), minStamp)}
 		            .reduceLeft(_+_)
 		if(ratedMovieOfUsers(u).size > 0)
-			sum.toDouble / ratedMovieOfUsers(u).size
+			sum / ratedMovieOfUsers(u).size
 		else
 			globalMeanDate
 	}
 	//need to fix and the one in SVD++ SVD
-	val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
-	val globalMeanDate = ratingFile.foldLeft(0.0)( (a,b) => a + days(b.timestamp, minStamp)) / ratingFile.size
+	//val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
+	val overallAverage = {
+		var count = 0
+		var sum = 0.0
+		for(u <- 0 until numUsers ; i <- 0 until numMovies)
+			if(ratings(u)(i) > 0.0){
+				sum += ratings(u)(i)
+				count += 1
+			}
+		sum / count
+	}	
+	//val globalMeanDate = ratingFile.foldLeft(0.0)( (a,b) => a + days(b.timestamp, minStamp)) / ratingFile.size
+	val globalMeanDate = {
+		var count = 0
+		var sum = 0.0
+		for(u <- 0 until numUsers ; i <- 0 until numMovies)
+			if(ratings(u)(i) > 0.0){
+				sum += days(times(u)(i), minStamp)
+				count += 1
+			}
+		sum / count
+	}	
 
 	def predict(userIndex: Int, movieIndex: Int) = { 
 		overallAverage + userDeviation(userIndex) + movieDeviation(movieIndex) + dotProduct(userIndex, movieIndex)
@@ -497,37 +540,32 @@ class TimeSVD extends TrainingModel {
 			mae = mae + math.abs(actualRating - predictRating)
 			maeCount = maeCount + 1			
 		}
+		println("File name : " + filePath)
+		println("Number of factors : " + numFactors)
 		println("MAE = " + "%.3f".format(mae / maeCount) )
 
 /*
-For MovieLen 1m file with factor=2
-Matrix : 0.744
-SVD : 0.707
-SVD++ : 0.743 10 steps
-        0.727 50 steps
+**For MovieLen 1m file with factor=2
+[Matrix] : 0.744
+[SVD] : 0.707
+[SVD++] : 0.743 10 steps
+          0.727 50 steps
+                100 steps
 
-SVD++
-
-nFB(number of yj)用未知的定義，包含for(i <- 0 until nFB)的用法
-
-(gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
-w : numMovies
-nFB = 20
- 0.766 5000 steps
- 0.851 32740 step - 14735.7 seconds
-nFB = 2
- 0.755 5000 steps
- 0.834 19917 steps (因此不是train越多越好)
-
-nFB = 2
-(gamma, lambda1, lambda2) = (0.00007, 0.00005, 0.00015)
-w: nFB
- 0.738
-
-nFB用原來的定義 i.e. nFB=numMovies 
-weight = numMovies 
+**For MovieLen 100k file 
+[SVD]
 factor = 2
- 0.797 10 steps
+ 0.723 315 steps
+factor = 10
+ 0.841 100 steps
+ 0.834 500 steps
+ 0.872 1000 steps
+ 0.912 5000 steps
+[SVD++]
+factor = 2
+ 0.825 5 steps
+ 0.866 10 steps
+ ***
  0.745 15 steps
  0.827 20 steps
  0.805 30 steps
@@ -535,7 +573,6 @@ factor = 2
  0.827 100or150 steps
  0.722 100or150 steps
  0.825 200 steps
-
 factor = 10
  0.926 50 steps
  0.856 150 steps
