@@ -7,14 +7,13 @@ import java.util.concurrent.TimeUnit
 
 		case class RatingDataStructure(userID: Int, movieID: Int, rating: Double, timestamp: Long)
 
-		val filePath = "../dataset/ml-100k/u.data"
-		val ratingFile = Source.fromFile(filePath)
-		//val ratingFile = Source.fromFile("../dataset/ml-1m/ratings.dat")
+		//val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t")
+		val (filePath, splitStr) = ("../dataset/ml-1m/ratings.dat", "::")
+		val ratingFile = Source.fromFile(filePath)		
 			.getLines
 			.toList
 			.map{line =>
-				val fields = line.split("\t")
-				//val fields = line.split("::")
+				val fields = line.split(splitStr)
 				val tempRating = RatingDataStructure(fields(0).toInt, fields(1).toInt, fields(2).toDouble, fields(3).toLong)
 				tempRating
 				}
@@ -25,7 +24,7 @@ import java.util.concurrent.TimeUnit
 		                 .reduceLeft( (a,b) => if (a.movieID > b.movieID) a else b) 
 		                 .movieID				
 		//number of factors in matrix factorization
-		val numFactors = 10
+		val numFactors = 2
 
 		val ratings = Array.fill(numUsers)(Array.fill(numMovies)(0.0))
 		ratingFile.foreach{ x => ratings(x.userID - 1)(x.movieID - 1) =  x.rating }
@@ -148,7 +147,6 @@ class SVD extends TrainingModel {
 	//(0.01, 0.05) http://blog.csdn.net/zhaoxinfan/article/details/8821419
 	//(0.015, 0.015) 2008 (SVD) A Guide to Singular Value Decomposition for Collaborative Filtering
 
-	//val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
 	val overallAverage = {
 		var count = 0
 		var sum = 0.0
@@ -241,11 +239,10 @@ class SVDPlus extends TrainingModel {
 	val nFB = numMovies 
 	def w(value: Double): Double = value * 1000.0
 
-	val steps = 15
+	val steps = 50
 	val (gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
 	//(0.007, 0.005, 0.015) "Factorization meets the neighborhood- a multifaceted collaborative filtering model"
 
-	//val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
 	val overallAverage = {
 		var count = 0
 		var sum = 0.0
@@ -364,14 +361,17 @@ class SVDPlus extends TrainingModel {
 
 class TimeSVD extends TrainingModel {
 
-	val steps = 500
+	val steps = 30
 
 	val (beta) = (0.4)
-	val (gamma, lambda) = (0.002, 0.02)
+	val (gamma, lambda) = (0.002, 0.01)
 
 	//!! how to init
-	val userDeviation = Array.fill(numUsers)(0.0)
-	val movieDeviation = Array.fill(numMovies)(0.0)
+	val numBins = 30
+	val userDeviation = Array.fill(numUsers)(Random.nextDouble)
+	val movieDeviation = Array.fill(numMovies)(Random.nextDouble)
+	val movieDeviationT = Array.fill(numMovies)(Array.fill(numBins)(Random.nextDouble))
+	val alpha = Array.fill(numUsers)(Random.nextDouble)
 	val ratedMovieOfUsers = ratings.map{ x => 
 		                        val s = x.size 
 		                        for(i <- 0 until s if x(i) > 0.0) 
@@ -429,16 +429,30 @@ class TimeSVD extends TrainingModel {
 				val stamp = times(u)(i)
 				val t = days(stamp, minStamp)
 				val binT = bin(t)
-				val dev_ut = dev(u, t)
+				val devUT = dev(u, t)
+
+				val bi = movieDeviation(i)
+				val bit = movieDeviationT(i)(binT)
+				val bu = userDeviation(u)
+				//val but = userDeviationT(u, t)
+
+				val au = alpha(u)
+
+				//equation (11)
+				val bui = overallAverage + bu + au * devUT + /*but +*/ bi + bit
 
 				val eui = ratings(u)(i) - predict(u,i)
 
+				//update
 				userDeviation(u) += gamma * (eui - lambda * userDeviation(u))
 				movieDeviation(i) += gamma * (eui - lambda * movieDeviation(i))
-				for(h <- 0 until numFactors){
-					val puh = matrixP(u)(h)
-					matrixP(u)(h) += gamma * ( eui * matrixQ(h)(i) - lambda * matrixP(u)(h))
-					matrixQ(h)(i) += gamma * ( eui * puh - lambda * matrixQ(h)(i))
+				movieDeviationT(i)(binT) += gamma * (eui - lambda * bit)
+				alpha(u) += gamma * (eui * devUT - lambda * au)
+
+				for(f <- 0 until numFactors){
+					val puf = matrixP(u)(f)
+					matrixP(u)(f) += gamma * ( eui * matrixQ(f)(i) - lambda * matrixP(u)(f))
+					matrixQ(f)(i) += gamma * ( eui * puf - lambda * matrixQ(f)(i))
 				}
 			}
 		}
@@ -446,18 +460,19 @@ class TimeSVD extends TrainingModel {
 		var error = 0.0
 		for(u <- 0 until numUsers; i <- 0 until numMovies){
 			if (ratings(u)(i) > 0){ //??
-				val tempDot = ratings(u)(i) - predict(u,i)
-				error = error + tempDot * tempDot
+				val eui = ratings(u)(i) - predict(u,i)
+				error += eui * eui
 
 				//!! lambda
-				val bu2 = userDeviation(u) * userDeviation(u)
-				val bi2 = movieDeviation(i) * movieDeviation(i)
-				error = error + bu2 + bi2
-				for(h <- 0 until numFactors){					
-					val pu2 = matrixP(u)(h)*matrixP(u)(h)
-					val qi2 = matrixQ(h)(i)*matrixQ(h)(i)
+				val bu = userDeviation(u)
+				val bi = movieDeviation(i)
+				error += (lambda/2.0) * ( bu * bu + bi * bi )
+
+				for(f <- 0 until numFactors){					
+					val pu = matrixP(u)(f)
+					val qi = matrixQ(f)(i)
 					
-					error = error + (lambda/2.0) * ( pu2 + qi2 )
+					error += (lambda/2.0) * ( pu * pu + qi * qi )
 				}
 			}
 		}
@@ -465,10 +480,10 @@ class TimeSVD extends TrainingModel {
 	}
 
 	def days(d1: Long, d2: Long) = (TimeUnit.SECONDS.toDays(math.abs(d1 - d2))).toInt
-	def bin(day: Int) = (30.0 * day / numDays.toDouble ).toInt
+	def bin(day: Int) = (numBins.toDouble * day / numDays.toDouble ).toInt
 	def dev(u: Int, t: Int) = math.signum(t - userMeanDate(u)) * math.pow(math.abs(t - userMeanDate(u)), beta)
-/*
-	for(i <- 1 to 100) gradientDescent()
+
+/*	
 	var last = math.abs(gradientDescent())
 	var loop = true
 	var i = 1
@@ -495,9 +510,6 @@ class TimeSVD extends TrainingModel {
 
 }
 
-		var mae: Double = 0.0
-		var maeCount: Int = 0
-
 		val select = 3
 		
 		//Training
@@ -514,9 +526,16 @@ class TimeSVD extends TrainingModel {
 				println("Running SVD++ algorithm")
 				println
 				new SVDPlus
+			case 4 =>
+				println("Running timeSVD algorithm")
+				println
+				new TimeSVD
+
 		}
 
-		//def test(model: TrainingModel): Double { -1.0 }
+		var mae: Double = 0.0
+		var rmse: Double = 0.0
+		var evaluateCount: Int = 0
 
 		//Test
 		for(test <- testData){
@@ -537,20 +556,24 @@ class TimeSVD extends TrainingModel {
 			println(" Actual rating " + test.rating)
 			println				
 
-			mae = mae + math.abs(actualRating - predictRating)
-			maeCount = maeCount + 1			
+			mae += math.abs(actualRating - predictRating)
+			rmse += (actualRating - predictRating) * (actualRating - predictRating)
+			evaluateCount += 1
 		}
 		println("File name : " + filePath)
 		println("Number of factors : " + numFactors)
-		println("MAE = " + "%.3f".format(mae / maeCount) )
+		println("MAE = " + "%.3f".format(mae / evaluateCount) )
+		println("RMSE = " + "%.3f".format(math.sqrt(rmse / evaluateCount)) )
 
 /*
+(MAE, RMSE)
+
 **For MovieLen 1m file with factor=2
-[Matrix] : 0.744
-[SVD] : 0.707
-[SVD++] : 0.743 10 steps
+[Matrix] : (0.744, )
+[SVD] : (0.691, ) 1000 steps
+[SVD++] : (0.753, 0.965) 10 steps
           0.727 50 steps
-                100 steps
+
 
 **For MovieLen 100k file 
 [SVD]
@@ -565,16 +588,46 @@ factor = 10
 factor = 2
  0.825 5 steps
  0.866 10 steps
+ 0.795 15 steps
+ 0.766 20 steps
  ***
- 0.745 15 steps
- 0.827 20 steps
  0.805 30 steps
  0.778 50 steps
  0.827 100or150 steps
  0.722 100or150 steps
  0.825 200 steps
 factor = 10
- 0.926 50 steps
- 0.856 150 steps
-
+ 0.788 15 steps
+  50 steps
+  150 steps
+[timeSVD - part] compare to the paper Table2
+factor = 2
+ (0.822, 1.062) 20 steps
+ (0.748, 0.981) 30 steps
+ (0.767, 0.959) 50 steps
+ (0.746, 0.954) 100 steps
+ (0.786, 1.015) 200 steps
+ (0.793, 0.994) 500 steps
+ (0.842, 1.053) 1000 steps
+ () steps
+factor = 10
+ (0.852, 1.089) 20 steps
+ (0.813, 1.040) 25 steps
+ (0.780, 1.032) 30 steps
+factor = 20 
+ (0.858, 1.144) 20 steps
+ (0.839, 1.083) 25 steps
+ (0.827, 1.082) 30 steps
+factor = 50
+ (1.073, 1.507) 20 steps
+ (1.041, 1.426) 25 steps
+ (1.008, 1.314) 30 steps
+factor = 100
+ (1.110, 1.660) 20 steps
+ (1.216, 1.769) 25 steps
+ (1.287, 2.020) 30 steps
+facetor = 200
+ (1.815, 3.388) 20 steps
+ (1.799, 3.567) 30 steps
+ (0.987, 1.360) 30 steps - 1m dataset
 */		
