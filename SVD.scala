@@ -5,11 +5,18 @@ import scala.util.Random
 import scala.math
 import java.util.concurrent.TimeUnit
 
+object SVD {
+
 		case class RatingDataStructure(userID: Int, movieID: Int, rating: Double, timestamp: Long)
 
-		val (filePath, splitStr) = ("myratings.dat", "::")
-		//val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t")
+		//set algorithm, number of trainging iteration, 
+		//and number of factors in matrix factorization
+		val (select, steps, numFactors) = (4, 50, 200)
+		
+		//val (filePath, splitStr) = ("myratings.dat", "::")
+		val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t")
 		//val (filePath, splitStr) = ("../dataset/ml-1m/ratings.dat", "::")
+
 		val ratingFile = Source.fromFile(filePath)		
 			.getLines
 			.toList
@@ -24,12 +31,11 @@ import java.util.concurrent.TimeUnit
 		val numMovies = ratingFile 
 		                 .reduceLeft( (a,b) => if (a.movieID > b.movieID) a else b) 
 		                 .movieID				
-		//number of factors in matrix factorization
-		val numFactors = 2
 
 		val ratings = Array.fill(numUsers)(Array.fill(numMovies)(0.0))
 		ratingFile.foreach{ x => ratings(x.userID - 1)(x.movieID - 1) =  x.rating }
 
+	def main(args: Array[String]){
 		//隨機從numUsers個users中挑出testSize個test users
 		val testSize = (0.3 * numUsers).toInt
 		val userCandidate = List.range(1, numUsers+1)
@@ -51,8 +57,59 @@ import java.util.concurrent.TimeUnit
 			ratings(id - 1)(recent.movieID - 1) = 0.0
 			RatingDataStructure(id, recent.movieID, actualRating, recent.timestamp )
 		}
+		
+		//Training
+		val matrix = select match {
+			case 1 => 
+				println("Running matrix fatorization algorithm")
+				println
+				new MatrixFacotrization
+			case 2 => 
+				println("Running SVD algorithm")
+				println
+				new SVD
+			case 3 => 
+				println("Running SVD++ algorithm")
+				println
+				new SVDPlus
+			case 4 =>
+				println("Running timeSVD algorithm")
+				println
+				new TimeSVD
 
+		}
 
+		var mae: Double = 0.0
+		var rmse: Double = 0.0
+		var evaluateCount: Int = 0
+
+		//Test
+		for(test <- testData){
+
+			val actualRating = test.rating
+			
+			val predictRating = matrix.predict(test.userID-1, test.movieID - 1)
+			/*
+				value match {
+					case v if v < 1.0 => 1.0
+					case v if v > 5.0 => 5.0
+					case _ => value
+				}			
+				*/
+
+			println("User " + test.userID + " with movie " + test.movieID + " : ")
+			println(" Predic rating " + "%.3f".format(predictRating) )
+			println(" Actual rating " + test.rating)
+			println				
+
+			mae += math.abs(actualRating - predictRating)
+			rmse += (actualRating - predictRating) * (actualRating - predictRating)
+			evaluateCount += 1
+		}
+		println("File name : " + filePath)
+		println("Number of factors : " + numFactors)
+		println("MAE = " + "%.3f".format(mae / evaluateCount) )
+		println("RMSE = " + "%.3f".format(math.sqrt(rmse / evaluateCount)) )
 /*
 val ratings = Array(Array(5,3,0,1),
 	          Array(4,0,0,1),
@@ -65,7 +122,7 @@ val n = ratings.length
 val m = ratings(0).length
 val f = 3
 */
-
+	} //end of def main()
 //
 abstract class TrainingModel {
 
@@ -87,7 +144,6 @@ abstract class TrainingModel {
 // http://www.quuxlabs.com/blog/2010/09/matrix-factorization-a-simple-tutorial-and-implementation-in-python/
 class MatrixFacotrization extends TrainingModel {
 
-	val steps = 500
 	val alpha = 0.0002
 	val beta = 0.02		
 	//http://www.quuxlabs.com/blog/2010/09/matrix-factorization-a-simple-tutorial-and-implementation-in-python/
@@ -140,8 +196,6 @@ for(i <- 0 until n ) {
 //http://sifter.org/~simon/journal/20061211.html
 //"Matrix factorization techniques for recommender systems", 2009 
 class SVD extends TrainingModel {
-
-	val steps = 1000
 
 	val (gamma, lambda) = (0.002, 0.02)
 	//(0.001, 0.02) 
@@ -240,7 +294,6 @@ class SVDPlus extends TrainingModel {
 	val nFB = numMovies 
 	def w(value: Double): Double = value * 1000.0
 
-	val steps = 50
 	val (gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
 	//(0.007, 0.005, 0.015) "Factorization meets the neighborhood- a multifaceted collaborative filtering model"
 
@@ -361,8 +414,6 @@ class SVDPlus extends TrainingModel {
 }
 
 class TimeSVD extends TrainingModel {
-
-	val steps = 50
 
 	val (beta) = (0.4)
 	val (gamma, lambda) = (0.002, 0.01)
@@ -538,124 +589,66 @@ class TimeSVD extends TrainingModel {
 
 }
 
-		val select = 4
-		
-		//Training
-		val matrix = select match {
-			case 1 => 
-				println("Running matrix fatorization algorithm")
-				println
-				new MatrixFacotrization
-			case 2 => 
-				println("Running SVD algorithm")
-				println
-				new SVD
-			case 3 => 
-				println("Running SVD++ algorithm")
-				println
-				new SVDPlus
-			case 4 =>
-				println("Running timeSVD algorithm")
-				println
-				new TimeSVD
 
-		}
-
-		var mae: Double = 0.0
-		var rmse: Double = 0.0
-		var evaluateCount: Int = 0
-
-		//Test
-		for(test <- testData){
-
-			val actualRating = test.rating
-			
-			val predictRating = matrix.predict(test.userID-1, test.movieID - 1)
-			/*
-				value match {
-					case v if v < 1.0 => 1.0
-					case v if v > 5.0 => 5.0
-					case _ => value
-				}			
-				*/
-
-			println("User " + test.userID + " with movie " + test.movieID + " : ")
-			println(" Predic rating " + "%.3f".format(predictRating) )
-			println(" Actual rating " + test.rating)
-			println				
-
-			mae += math.abs(actualRating - predictRating)
-			rmse += (actualRating - predictRating) * (actualRating - predictRating)
-			evaluateCount += 1
-		}
-		println("File name : " + filePath)
-		println("Number of factors : " + numFactors)
-		println("MAE = " + "%.3f".format(mae / evaluateCount) )
-		println("RMSE = " + "%.3f".format(math.sqrt(rmse / evaluateCount)) )
+} // end of object TimeSVDplus
 
 /*
 (MAE, RMSE)
 
 **For MovieLen 1m file with factor=2
-[Matrix] : (0.744, )
-[SVD] : (0.691, ) 1000 steps
-[SVD++] : (0.753, 0.965) 10 steps
-          (0.735, 0.937) 50 steps
-
+[Matrix] : 
+[SVD] :  1000 steps
+[SVD++] :  10 steps
+           50 steps
 
 **For MovieLen 100k file 
+
+[Matrix factorization]
+factor = 2
+ (0.792, 1.034) 100 steps
+ (0.778, 1.014) 500 steps
+factor = 100
+ (1.354, 1.854) 100 steps
+
 [SVD]
 factor = 2
+ (0.800, 1.035) 100 steps
+ (0.824, 1.091) 200 steps
+ (0.764, 1.014) 300 steps
  0.723 315 steps
 factor = 10
- 0.841 100 steps
- 0.834 500 steps
- 0.872 1000 steps
- 0.912 5000 steps
+ (0.835, 1.071) 100 steps
+
 [SVD++]
 factor = 2
- 0.825 5 steps
- 0.866 10 steps
- 0.795 15 steps
- 0.766 20 steps
- ***
- 0.805 30 steps
- 0.778 50 steps
- 0.827 100or150 steps
+ (0.846, 1.067) 5 steps
+ (0.819, 1.062) 10 steps
+ (0.841, 1.052) 20 steps
  0.722 100or150 steps
- 0.825 200 steps
 factor = 10
+ (0.886, 1.139) 5 steps
  0.788 15 steps
-  50 steps
-  150 steps
+
 [timeSVD - part] compare to the paper Table2
 factor = 2
- (0.822, 1.062) 20 steps
- (0.748, 0.981) 30 steps
- (0.767, 0.959) 50 steps
- (0.746, 0.954) 100 steps
- (0.786, 1.015) 200 steps
- (0.793, 0.994) 500 steps
- (0.842, 1.053) 1000 steps
- () steps
+ (0.798, 1.047) 20 steps
+ (0.752, 0.983) 30 steps
+ (0.776, 0.994) 100 steps
 factor = 10
- (0.852, 1.089) 20 steps
- (0.813, 1.040) 25 steps
- (0.780, 1.032) 30 steps
+ (0.821, 1.054) 20 steps
+ (0.868, 1.109) 25 steps
+ (0.818, 1.039) 30 steps
 factor = 20 
- (0.858, 1.144) 20 steps
- (0.839, 1.083) 25 steps
- (0.827, 1.082) 30 steps
+ (0.928, 1.189) 20 steps
+ (0.849, 1.141) 30 steps
 factor = 50
- (1.073, 1.507) 20 steps
- (1.041, 1.426) 25 steps
- (1.008, 1.314) 30 steps
+ (1.125, 1.603) 20 steps
+ (1.085, 1.462) 30 steps
 factor = 100
- (1.110, 1.660) 20 steps
- (1.216, 1.769) 25 steps
- (1.287, 2.020) 30 steps
+ (1.1396, 1.909) 20 steps
+ (1.308, 1.929) 30 steps
 facetor = 200
- (1.815, 3.388) 20 steps
- (1.799, 3.567) 30 steps
- (0.987, 1.360) 30 steps - 1m dataset
+ (1.619, 2.801) 20 steps
+ (1.522, 2.664) 30 steps
+
 */		
