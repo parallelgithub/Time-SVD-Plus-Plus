@@ -7,7 +7,8 @@ import java.util.concurrent.TimeUnit
 
 		case class RatingDataStructure(userID: Int, movieID: Int, rating: Double, timestamp: Long)
 
-		val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t")
+		val (filePath, splitStr) = ("myratings.dat", "::")
+		//val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t")
 		//val (filePath, splitStr) = ("../dataset/ml-1m/ratings.dat", "::")
 		val ratingFile = Source.fromFile(filePath)		
 			.getLines
@@ -361,7 +362,7 @@ class SVDPlus extends TrainingModel {
 
 class TimeSVD extends TrainingModel {
 
-	val steps = 30
+	val steps = 5
 
 	val (beta) = (0.4)
 	val (gamma, lambda) = (0.002, 0.01)
@@ -382,13 +383,21 @@ class TimeSVD extends TrainingModel {
 	val maxStamp = ratingFile.reduceLeft( (a,b) => if (a.timestamp > b.timestamp) a else b).timestamp
 	val numDays = days(maxStamp, minStamp) + 1
 	val times = Array.fill(numUsers)(Array.fill[Long](numMovies)(0))
+
 	//For the rating(u)(i) which we want to predict(to test), its timestamp is preserved
 	//另一種可能的作法是都設為現在的時間
 	ratingFile.foreach{ x => times(x.userID - 1)(x.movieID - 1) =  x.timestamp }
+	val userDeviationT = Array.fill(numUsers)(collection.mutable.HashMap[Int, Double]())
+	ratingFile.foreach{ x => 
+		val t = days(x.timestamp, minStamp)
+		userDeviationT(x.userID - 1) += (t -> 0.0) 
+	}
+	//userDeviationT.foreach{println}
+
 	val userMeanDate = Array.tabulate(ratedMovieOfUsers.size) { u =>
 		val sum: Double = ratedMovieOfUsers(u)
 		            .map{ i => days(times(u)(i), minStamp)}
-		            .reduceLeft(_+_)
+		            .foldLeft(0.0)(_+_)
 		if(ratedMovieOfUsers(u).size > 0)
 			sum / ratedMovieOfUsers(u).size
 		else
@@ -434,6 +443,8 @@ class TimeSVD extends TrainingModel {
 
 		for(u <- 0 until numUsers ; i <- 0 until numMovies){
 			if (ratings(u)(i) > 0){ //??
+
+				//唯有ratings(u)(i) > 0 時，stamp才不為0、t才會合理
 				val stamp = times(u)(i)
 				val t = days(stamp, minStamp)
 				val binT = bin(t)
@@ -487,7 +498,8 @@ class TimeSVD extends TrainingModel {
 		error  
 	}
 
-	def days(d1: Long, d2: Long) = (TimeUnit.SECONDS.toDays(math.abs(d1 - d2))).toInt
+	//def days(d1: Long, d2: Long) = (TimeUnit.SECONDS.toDays(math.abs(d1 - d2))).toInt
+	def days(d1: Long, d2: Long) = (TimeUnit.MILLISECONDS.toDays(math.abs(d1 - d2))).toInt
 	def bin(day: Int) = (numBins.toDouble * day / numDays.toDouble ).toInt
 	def dev(u: Int, t: Int) = math.signum(t - userMeanDate(u)) * math.pow(math.abs(t - userMeanDate(u)), beta)
 
@@ -518,7 +530,7 @@ class TimeSVD extends TrainingModel {
 
 }
 
-		val select = 4
+		val select = 2
 		
 		//Training
 		val matrix = select match {
@@ -580,7 +592,7 @@ class TimeSVD extends TrainingModel {
 [Matrix] : (0.744, )
 [SVD] : (0.691, ) 1000 steps
 [SVD++] : (0.753, 0.965) 10 steps
-          0.727 50 steps
+          (0.735, 0.937) 50 steps
 
 
 **For MovieLen 100k file 
