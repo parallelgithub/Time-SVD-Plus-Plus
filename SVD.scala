@@ -362,7 +362,7 @@ class SVDPlus extends TrainingModel {
 
 class TimeSVD extends TrainingModel {
 
-	val steps = 5
+	val steps = 50
 
 	val (beta) = (0.4)
 	val (gamma, lambda) = (0.002, 0.01)
@@ -431,10 +431,11 @@ class TimeSVD extends TrainingModel {
 		val stamp = times(userIndex)(movieIndex)
 		val t = days(stamp, minStamp)
 		val binT = bin(t)
+		val but = if (userDeviationT(userIndex).contains(t)) userDeviationT(userIndex)(t) else 0.0
 		//!! check bui-contain
 		overallAverage + 
-		  userDeviation(userIndex) + alpha(userIndex) * dev(userIndex, t)
-		  movieDeviation(movieIndex) + movieDeviationT(movieIndex)(binT)
+		  userDeviation(userIndex) + alpha(userIndex) * dev(userIndex, t) + but +
+		  movieDeviation(movieIndex) + movieDeviationT(movieIndex)(binT) +
 		  dotProduct(userIndex, movieIndex)
 
 	}
@@ -448,25 +449,24 @@ class TimeSVD extends TrainingModel {
 				val stamp = times(u)(i)
 				val t = days(stamp, minStamp)
 				val binT = bin(t)
-				val devUT = dev(u, t)
-
-				val bi = movieDeviation(i)
 				val bit = movieDeviationT(i)(binT)
-				val bu = userDeviation(u)
-				//val but = userDeviationT(u, t)
 
-				val au = alpha(u)
+				if(!userDeviationT(u).contains(t))
+					userDeviationT(u) += (t -> 0.0)
+				val but = userDeviationT(u)(t)
 
 				//equation (11)
-				val bui = overallAverage + bu + au * devUT + /*but +*/ bi + bit
+				//val bui = overallAverage + bu + au * devUT + but + bi + bit
 
 				val eui = ratings(u)(i) - predict(u,i)
+				val butNew = but + gamma * (eui - lambda * but)
 
 				//update
 				userDeviation(u) += gamma * (eui - lambda * userDeviation(u))
+				userDeviationT(u) += (t -> butNew)
 				movieDeviation(i) += gamma * (eui - lambda * movieDeviation(i))
 				movieDeviationT(i)(binT) += gamma * (eui - lambda * bit)
-				alpha(u) += gamma * (eui * devUT - lambda * au)
+				alpha(u) += gamma * (eui * dev(u, t) - lambda * alpha(u))
 
 				for(f <- 0 until numFactors){
 					val puf = matrixP(u)(f)
@@ -482,10 +482,18 @@ class TimeSVD extends TrainingModel {
 				val eui = ratings(u)(i) - predict(u,i)
 				error += eui * eui
 
-				//!! lambda
+				val stamp = times(u)(i)
+				val t = days(stamp, minStamp)
+				val binT = bin(t)
+				val bit = movieDeviationT(i)(binT)
 				val bu = userDeviation(u)
+				val au = alpha(u)
+
+				val but = if(userDeviationT(u).contains(t)) userDeviationT(u)(t) else 0.0
+
 				val bi = movieDeviation(i)
-				error += (lambda/2.0) * ( bu * bu + bi * bi )
+				error += (lambda/2.0) * 
+				         ( bu * bu + au * au + but * but + bi * bi + bit * bit)
 
 				for(f <- 0 until numFactors){					
 					val pu = matrixP(u)(f)
@@ -530,7 +538,7 @@ class TimeSVD extends TrainingModel {
 
 }
 
-		val select = 2
+		val select = 4
 		
 		//Training
 		val matrix = select match {
