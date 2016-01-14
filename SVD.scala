@@ -7,8 +7,8 @@ import java.util.concurrent.TimeUnit
 
 		case class RatingDataStructure(userID: Int, movieID: Int, rating: Double, timestamp: Long)
 
-		//val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t")
-		val (filePath, splitStr) = ("../dataset/ml-1m/ratings.dat", "::")
+		val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t")
+		//val (filePath, splitStr) = ("../dataset/ml-1m/ratings.dat", "::")
 		val ratingFile = Source.fromFile(filePath)		
 			.getLines
 			.toList
@@ -382,7 +382,8 @@ class TimeSVD extends TrainingModel {
 	val maxStamp = ratingFile.reduceLeft( (a,b) => if (a.timestamp > b.timestamp) a else b).timestamp
 	val numDays = days(maxStamp, minStamp) + 1
 	val times = Array.fill(numUsers)(Array.fill[Long](numMovies)(0))
-	//For the rating(u)(i) which we want to predict, its timestamp is preserved
+	//For the rating(u)(i) which we want to predict(to test), its timestamp is preserved
+	//另一種可能的作法是都設為現在的時間
 	ratingFile.foreach{ x => times(x.userID - 1)(x.movieID - 1) =  x.timestamp }
 	val userMeanDate = Array.tabulate(ratedMovieOfUsers.size) { u =>
 		val sum: Double = ratedMovieOfUsers(u)
@@ -418,7 +419,14 @@ class TimeSVD extends TrainingModel {
 	}	
 
 	def predict(userIndex: Int, movieIndex: Int) = { 
-		overallAverage + userDeviation(userIndex) + movieDeviation(movieIndex) + dotProduct(userIndex, movieIndex)
+		val stamp = times(userIndex)(movieIndex)
+		val t = days(stamp, minStamp)
+		val binT = bin(t)
+		//!! check bui-contain
+		overallAverage + 
+		  userDeviation(userIndex) + alpha(userIndex) * dev(userIndex, t)
+		  movieDeviation(movieIndex) + movieDeviationT(movieIndex)(binT)
+		  dotProduct(userIndex, movieIndex)
 
 	}
 
@@ -510,7 +518,7 @@ class TimeSVD extends TrainingModel {
 
 }
 
-		val select = 3
+		val select = 4
 		
 		//Training
 		val matrix = select match {
