@@ -10,12 +10,14 @@ object SVD {
 
 	//set algorithm, number of trainging iteration, 
 	//and number of factors in matrix factorization
-	val (select, steps, numFactors) = (4, 100, 200)
+	val (selectAlgorithm, steps, numFactors) = (4, 10, 2)
 	
-	//val (filePath, splitStr) = ("myratings.dat", "::")
-	val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t")
-	//val (filePath, splitStr) = ("../dataset/ml-1m/ratings.dat", "::")
+	val (filePath, splitStr) = ("ratingsNetflix.dat", "::") //從Netflix篩選出的小檔案
+	//val (filePath, splitStr) = ("ratings20m.dat", "::") //從MovieLen 20m 篩選出的小檔案
+	//val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t") //MovieLen小檔案
+	//val (filePath, splitStr) = ("../dataset/ml-1m/ratings.dat", "::") //MovieLen大檔案
 
+	//讀取評分檔案，存為List，每一筆評分的資料結構存為RatingDataStructure
 	val ratingFile = Source.fromFile(filePath)		
 		.getLines
 		.toList
@@ -31,23 +33,33 @@ object SVD {
 	                 .reduceLeft( (a,b) => if (a.movieID > b.movieID) a else b) 
 	                 .movieID				
 
+	//Rating Matrix
+	//!! how to initial
 	val ratings = Array.fill(numUsers)(Array.fill(numMovies)(0.0))
 	ratingFile.foreach{ x => ratings(x.userID - 1)(x.movieID - 1) =  x.rating }
 
 	def main(args: Array[String]){
-		//隨機從numUsers個users中挑出testSize個test users
-		val testSize = (0.3 * numUsers).toInt
-		val userCandidate = List.range(1, numUsers+1)
-		def generateTestUsers(candidate: List[Int],count: Int, n: Int): List[Int] = {
+
+		//挑出每一個user為候選
+		//val userCandidate = List.range(1, numUsers+1)
+
+		//挑出所有有評分的user為候選
+		val userCandidate = ratingFile.map{ _.userID }.toSet.toList
+
+		//隨機從候選users中挑出testSize個test users
+		val testSize = (0.3 * userCandidate.size).toInt
+
+		//從有n個候選user的candidate中隨機選出count個test users
+		def generateTestUsers(candidate: List[Int], n: Int, count: Int): List[Int] = {
 			if(count == 0)
 				Nil
 			else{
 				val i = Random.nextInt(n)	
-				candidate(i) :: generateTestUsers((candidate.take(i) ::: candidate.drop(i+1)), count-1, n-1)
+				candidate(i) :: generateTestUsers((candidate.take(i) ::: candidate.drop(i+1)), n-1, count-1)
 			}
 		}
-		//儲存 test user 的資料，並將預計測試的電影在matrix重設為0
-		val testData = generateTestUsers(userCandidate, testSize, numUsers).map{ id =>
+		//儲存 test users 的資料，並將預計測試的電影在matrix重設為0
+		val testData = generateTestUsers(userCandidate, userCandidate.size, testSize).map{ id =>
 			val recent = ratingFile 
 			              .filter( _.userID == id ) 
 			              .reduceLeft( (a,b) => if (a.timestamp > b.timestamp) a else b)
@@ -58,7 +70,7 @@ object SVD {
 		}
 		
 		//Training
-		val matrix = select match {
+		val matrix = selectAlgorithm match {
 			case 1 => 
 				println("Running matrix fatorization algorithm")
 				println
