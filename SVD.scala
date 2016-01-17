@@ -10,7 +10,7 @@ object SVD {
 
 	//set algorithm, number of trainging iteration, 
 	//and number of factors in matrix factorization
-	val (selectAlgorithm, steps, numFactors) = (4, 30, 10)
+	val (selectAlgorithm, steps, numFactors) = (4, 30, 100)
 
 	val (filePath, splitStr) = ("ratingsNetflix.dat", "::") //從Netflix篩選出的小檔案
 	//val (filePath, splitStr) = ("ratings20m.dat", "::") //從MovieLen 20m 篩選出的小檔案
@@ -421,7 +421,7 @@ object SVD {
 	class TimeSVD extends TrainingModel {
 
 		val (beta) = (0.4)
-		val (gamma, lambda) = (0.002, 0.01)
+		val (gamma, lambda) = (0.0002, 0.01)
 
 		//!! how to init
 		val numBins = 30
@@ -429,6 +429,7 @@ object SVD {
 		val movieDeviation = Array.fill(numMovies)(Random.nextDouble)
 		val movieDeviationT = Array.fill(numMovies)(Array.fill(numBins)(Random.nextDouble))
 		val alpha = Array.fill(numUsers)(Random.nextDouble)
+		val alphaK = Array.fill(numUsers)(Array.fill(numFactors)(Random.nextDouble))
 		val ratedMovieOfUsers = ratings.map{ x => 
 			                        val s = x.size 
 			                        for(i <- 0 until s if x(i) > 0.0) 
@@ -488,11 +489,19 @@ object SVD {
 			val t = days(stamp, minStamp)
 			val binT = bin(t)
 			val but = if (userDeviationT(userIndex).contains(t)) userDeviationT(userIndex)(t) else 0.0
+
+			var sum = 0.0
+			for(k <- 0 until numFactors) {
+				sum = sum + matrixQ(k)(movieIndex) * 
+				              (matrixP(userIndex)(k) + 
+				               alphaK(userIndex)(k) * dev(userIndex, t) )
+			}	
+			sum				
+
 			//!! check bui-contain
 			overallAverage + 
 			  userDeviation(userIndex) + alpha(userIndex) * dev(userIndex, t) + but +
-			  movieDeviation(movieIndex) + movieDeviationT(movieIndex)(binT) +
-			  dotProduct(userIndex, movieIndex)
+			  movieDeviation(movieIndex) + movieDeviationT(movieIndex)(binT) + sum
 
 		}
 
@@ -524,10 +533,11 @@ object SVD {
 					movieDeviationT(i)(binT) += gamma * (eui - lambda * bit)
 					alpha(u) += gamma * (eui * dev(u, t) - lambda * alpha(u))
 
-					for(f <- 0 until numFactors){
-						val puf = matrixP(u)(f)
-						matrixP(u)(f) += gamma * ( eui * matrixQ(f)(i) - lambda * matrixP(u)(f))
-						matrixQ(f)(i) += gamma * ( eui * puf - lambda * matrixQ(f)(i))
+					for(k <- 0 until numFactors){
+						val puk = matrixP(u)(k)
+						alphaK(u)(k) += gamma * ( eui * matrixQ(k)(i) * dev(u, t) - lambda * alphaK(u)(k))
+						matrixP(u)(k) += gamma * ( eui * matrixQ(k)(i) - lambda * matrixP(u)(k))
+						matrixQ(k)(i) += gamma * ( eui * puk - lambda * matrixQ(k)(i))
 					}
 				}
 			}
@@ -551,11 +561,12 @@ object SVD {
 					error += (lambda/2.0) * 
 					         ( bu * bu + au * au + but * but + bi * bi + bit * bit)
 
-					for(f <- 0 until numFactors){					
-						val pu = matrixP(u)(f)
-						val qi = matrixQ(f)(i)
+					for(k <- 0 until numFactors){
+						val auk = alphaK(u)(k)
+						val pu = matrixP(u)(k)
+						val qi = matrixQ(k)(i)
 						
-						error += (lambda/2.0) * ( pu * pu + qi * qi )
+						error += (lambda/2.0) * ( auk * auk + pu * pu + qi * qi )
 					}
 				}
 			}
@@ -617,19 +628,19 @@ factor = 20
 
 [timeSVD - part] compare to the paper Table2
 factor = 10
- (1.324, 1.686) 20 steps
- (1.263, 1.591) 30 steps
+ (1.359, 1.781) 20 steps
+ (1.125, 1.525) 30 steps
 factor = 20 
- (1.023, 1.373) 20 steps
- (0.883, 1.129) 30 steps
+ (1.366, 1.772) 20 steps
+ (1.344, 1.711) 30 steps
 factor = 50
- (1.208, 1.541) 20 steps
- (1.093, 1.392) 30 steps
+ (1.331, 1.767) 20 steps
+ (1.299, 1.681) 30 steps
 factor = 100
- (0.995, 1.258) 500 steps
- (1.122, 1.432) 1000 steps
+ (1.535, 1.926) 20 steps
+ (1.360, 1.688) 30 steps
 facetor = 200
- (1.104, 1.464) 500 steps
- (1.430, 1.773) 1000 steps
+ (1.430, 1.918) 20 steps
+ (1.348, 1.769) 30 steps
 
 */		
