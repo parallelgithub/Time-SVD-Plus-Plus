@@ -11,7 +11,7 @@ object SVD {
 	//set algorithm, number of trainging iteration, 
 	//and number of factors in matrix factorization
 	val (selectAlgorithm, steps, numFactors) = (4, 30, 10)
-	
+
 	val (filePath, splitStr) = ("ratingsNetflix.dat", "::") //從Netflix篩選出的小檔案
 	//val (filePath, splitStr) = ("ratings20m.dat", "::") //從MovieLen 20m 篩選出的小檔案
 	//val (filePath, splitStr) = ("../dataset/ml-100k/u.data", "\t") //MovieLen小檔案
@@ -104,14 +104,8 @@ object SVD {
 
 			val actualRating = test.rating
 			
-			val predictRating = matrix.predict(test.userID-1, test.movieID - 1)
-			/*
-				value match {
-					case v if v < 1.0 => 1.0
-					case v if v > 5.0 => 5.0
-					case _ => value
-				}			
-				*/
+			//val predictRating = matrix.predict(test.userID-1, test.movieID - 1)
+			val predictRating = matrix.scalePredict(test.userID-1, test.movieID - 1)
 
 			println("User " + test.userID + " with movie " + test.movieID + " : ")
 			println(" Predic rating " + "%.3f".format(predictRating) )
@@ -144,6 +138,17 @@ object SVD {
 			sum		
 		}
 
+		def scalePredict(userIndex: Int, movieIndex: Int) = {
+
+			val value = predict(userIndex, movieIndex)
+
+			value match {
+				case v if v < 1.0 => 1.0
+				case v if v > 5.0 => 5.0
+				case _ => value
+			}			
+
+		}
 		def predict(userIndex: Int, movieIndex: Int): Double 
 	}
 
@@ -593,63 +598,38 @@ object SVD {
 } // end of object TimeSVDplus
 
 /*
-(MAE, RMSE)
 
-**For MovieLen 1m file with factor=2
-[Matrix] : 
-[SVD] :  1000 steps
-[SVD++] :  10 steps
-           50 steps
-
-**For MovieLen 100k file 
+(MAE, RMSE) For my Netflix file
 
 [Matrix factorization]
-factor = 2
- (0.792, 1.034) 100 steps
- (0.778, 1.014) 500 steps
-factor = 100
- (1.354, 1.854) 100 steps
+factor = 20
+ (1.031, 1.236) 30 steps (46 test cases)
 
 [SVD]
-factor = 2
- (0.800, 1.035) 100 steps
- (0.824, 1.091) 200 steps
- (0.764, 1.014) 300 steps
- 0.723 315 steps
-factor = 10
- (0.835, 1.071) 100 steps
+factor = 20
+ (0.912, 1.120) 30 steps (46 test cases)
 
 [SVD++]
-factor = 2
- (0.846, 1.067) 5 steps
- (0.819, 1.062) 10 steps
- (0.841, 1.052) 20 steps
- 0.722 100or150 steps
 factor = 10
- (0.886, 1.139) 5 steps
- 0.788 15 steps
+ (0.877, 1.066) 30 steps (46 test cases)
+factor = 20
+ (0.799, 1.044) 30 steps (46 test cases)
 
 [timeSVD - part] compare to the paper Table2
-factor = 2
- (0.798, 1.047) 20 steps
- (0.752, 0.983) 30 steps
- (0.776, 0.994) 100 steps
 factor = 10
- (0.821, 1.054) 20 steps
- (0.868, 1.109) 25 steps
- (0.818, 1.039) 30 steps
+ (1.324, 1.686) 20 steps
+ (1.263, 1.591) 30 steps
 factor = 20 
- (0.928, 1.189) 20 steps
- (0.849, 1.141) 30 steps
+ (1.023, 1.373) 20 steps
+ (0.883, 1.129) 30 steps
 factor = 50
- (1.125, 1.603) 20 steps
- (1.085, 1.462) 30 steps
+ (1.208, 1.541) 20 steps
+ (1.093, 1.392) 30 steps
 factor = 100
- (1.1396, 1.909) 20 steps
- (1.308, 1.929) 30 steps
+ (0.995, 1.258) 500 steps
+ (1.122, 1.432) 1000 steps
 facetor = 200
- (1.619, 2.801) 20 steps
- (1.522, 2.664) 30 steps
- (1.518, 2.439) 50 steps
+ (1.104, 1.464) 500 steps
+ (1.430, 1.773) 1000 steps
 
 */		
