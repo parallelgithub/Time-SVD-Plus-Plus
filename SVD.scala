@@ -450,6 +450,7 @@ object SVD {
 			userDeviationT(x.userID - 1) += (t -> 0.0) 
 		}
 		//userDeviationT.foreach{println}
+		val timePreference = Array.fill(numUsers)( Array.fill(numFactors)(collection.mutable.HashMap[Int, Double]()) )
 
 		val userMeanDate = Array.tabulate(ratedMovieOfUsers.size) { u =>
 			val sum: Double = ratedMovieOfUsers(u)
@@ -488,19 +489,27 @@ object SVD {
 			val stamp = times(userIndex)(movieIndex)
 			val t = days(stamp, minStamp)
 			val binT = bin(t)
-			val but = if (userDeviationT(userIndex).contains(t)) userDeviationT(userIndex)(t) else 0.0
+			val bUT = if (userDeviationT(userIndex).contains(t)) userDeviationT(userIndex)(t) else 0.0
 
 			var sum = 0.0
 			for(k <- 0 until numFactors) {
-				sum = sum + matrixQ(k)(movieIndex) * 
-				              (matrixP(userIndex)(k) + 
-				               alphaK(userIndex)(k) * dev(userIndex, t) )
+				val put = if (timePreference(userIndex)(k).contains(t)) 
+				             timePreference(userIndex)(k)(t)
+				           else 
+				             0.0
+
+				//q_i * ( p_u + alpha_u * dev_u(t) + p_u(t) )
+				sum += matrixQ(k)(movieIndex) * 
+				         (matrixP(userIndex)(k) + 
+				          alphaK(userIndex)(k) * dev(userIndex, t) + 
+				          put)
 			}	
 			sum				
 
 			//!! check bui-contain
+			//prediction = mui + b_u + alaph_u * dev_u(t) + b_ut + b_i + b_i-bin(t) + q_i * ( p_u + alpha_u * dev_u(t) + p_u(t))
 			overallAverage + 
-			  userDeviation(userIndex) + alpha(userIndex) * dev(userIndex, t) + but +
+			  userDeviation(userIndex) + alpha(userIndex) * dev(userIndex, t) + bUT +
 			  movieDeviation(movieIndex) + movieDeviationT(movieIndex)(binT) + sum
 
 		}
@@ -518,26 +527,40 @@ object SVD {
 
 					if(!userDeviationT(u).contains(t))
 						userDeviationT(u) += (t -> 0.0)
-					val but = userDeviationT(u)(t)
-
-					//equation (11)
-					//val bui = overallAverage + bu + au * devUT + but + bi + bit
 
 					val eui = ratings(u)(i) - predict(u,i)
-					val butNew = but + gamma * (eui - lambda * but)
+					val but = userDeviationT(u)(t) + 
+					          gamma * (eui - lambda * userDeviationT(u)(t))
 
-					//update
+					//update b_u
 					userDeviation(u) += gamma * (eui - lambda * userDeviation(u))
-					userDeviationT(u) += (t -> butNew)
-					movieDeviation(i) += gamma * (eui - lambda * movieDeviation(i))
-					movieDeviationT(i)(binT) += gamma * (eui - lambda * bit)
+					//update alpha_u
 					alpha(u) += gamma * (eui * dev(u, t) - lambda * alpha(u))
+					//update b_ut
+					userDeviationT(u) += (t -> but)
+					//update b_i
+					movieDeviation(i) += gamma * (eui - lambda * movieDeviation(i))
+					//update b_i-bin(t)
+					movieDeviationT(i)(binT) += gamma * (eui - lambda * bit)
 
 					for(k <- 0 until numFactors){
-						val puk = matrixP(u)(k)
-						alphaK(u)(k) += gamma * ( eui * matrixQ(k)(i) * dev(u, t) - lambda * alphaK(u)(k))
-						matrixP(u)(k) += gamma * ( eui * matrixQ(k)(i) - lambda * matrixP(u)(k))
-						matrixQ(k)(i) += gamma * ( eui * puk - lambda * matrixQ(k)(i))
+						val pu = matrixP(u)(k)
+						val qi = matrixQ(k)(i)
+						val alphaU = alphaK(u)(k)
+
+						if(!timePreference(u)(k).contains(t))
+							timePreference(u)(k) += (t -> 0.0)
+						val put = timePreference(u)(k)(t) + 
+						           gamma * (eui * qi - lambda * timePreference(u)(k)(t))
+
+						//update p_u
+						matrixP(u)(k) += gamma * ( eui * qi - lambda * pu)
+						//update q_i
+						matrixQ(k)(i) += gamma * ( eui * (pu + alphaU * dev(u,t) + put) - lambda * qi )
+						//update alpha_uk
+						alphaK(u)(k) += gamma * ( eui * qi * dev(u, t) - lambda * alphaU)
+						//update p_ku(t)
+						timePreference(u)(k) += (t -> put)
 					}
 				}
 			}
@@ -565,8 +588,12 @@ object SVD {
 						val auk = alphaK(u)(k)
 						val pu = matrixP(u)(k)
 						val qi = matrixQ(k)(i)
+						val put = if (timePreference(u)(k).contains(t)) 
+						             timePreference(u)(k)(t) 
+						           else 
+						             0.0
 						
-						error += (lambda/2.0) * ( auk * auk + pu * pu + qi * qi )
+						error += (lambda/2.0) * ( auk * auk + pu * pu + qi * qi + put * put)
 					}
 				}
 			}
