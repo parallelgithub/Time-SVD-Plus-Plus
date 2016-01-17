@@ -10,7 +10,7 @@ object SVD {
 
 	//set algorithm, number of trainging iteration, 
 	//and number of factors in matrix factorization
-	val (selectAlgorithm, steps, numFactors) = (5, 20, 10)
+	val (selectAlgorithm, steps, numFactors) = (1, 20, 10)
 
 	val (filePath, splitStr) = ("ratingsNetflix1.dat", "::") //從Netflix篩選出的100k檔案
 	//val (filePath, splitStr) = ("ratingsNetflix2.dat", "::") //從Netflix篩選出的1m檔案
@@ -334,7 +334,7 @@ object SVD {
 
 			for(j <- ratedMovieOfUsers(userIndex))
 				for(f <- 0 until numFactors)
-					value += feedback(f)(j) + matrixQ(f)(movieIndex)
+					value += feedback(f)(j) * matrixQ(f)(movieIndex)
 
 			//mui + bu + bi + qi*[pu + sum(yj)]		
 			overallAverage + 
@@ -516,7 +516,6 @@ object SVD {
 				          alphaK(userIndex)(k) * dev(userIndex, t) + 
 				          put)
 			}	
-			sum				
 
 			//!! check bui-contain
 			//prediction = mui + b_u + alaph_u * dev_u(t) + b_ut + b_i + b_i-bin(t) + q_i * ( p_u + alpha_u * dev_u(t) + p_u(t))
@@ -881,26 +880,26 @@ object SVD {
 
 [Matrix factorization]
 factor = 20
- (1.101, 1.366) 30 steps 
+ () 30 steps 
 
 [SVD]
 factor = 20
- (1.008, 1.293) 30 steps
+ () 30 steps
 
 [SVD++]
 factor = 10
- (0.893, 1.092) 30 steps
+ () 30 steps
 factor = 20
- (0.935, 1.221) 30 steps (46 test cases)
+ () 30 steps 
 
 [timeSVD] compare to the paper Table2
 factor = 10
- (1.172, 1.619) 30 steps
+ () 30 steps
 factor = 20 
- (1.466, 1.884) 30 steps
+ () 30 steps
 factor = 50
- (1.325, 1.867) 30 steps
+ () 30 steps
 factor = 100
- (1.261, 1.668) 30 steps
+ () 30 steps
 
 */		
