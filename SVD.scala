@@ -10,7 +10,7 @@ object SVD {
 
 	//set algorithm, number of trainging iteration, 
 	//and number of factors in matrix factorization
-	val (selectAlgorithm, steps, numFactors) = (4, 10, 2)
+	val (selectAlgorithm, steps, numFactors) = (4, 30, 10)
 	
 	val (filePath, splitStr) = ("ratingsNetflix.dat", "::") //從Netflix篩選出的小檔案
 	//val (filePath, splitStr) = ("ratings20m.dat", "::") //從MovieLen 20m 篩選出的小檔案
@@ -43,8 +43,13 @@ object SVD {
 		//挑出每一個user為候選
 		//val userCandidate = List.range(1, numUsers+1)
 
-		//挑出所有有評分的user為候選
-		val userCandidate = ratingFile.map{ _.userID }.toSet.toList
+		//挑出所有有兩份評分的user為候選 (取一份評分當test後，至少還留下一份做train)
+		//val userCandidate = ratingFile.map{ _.userID }.toSet.toList
+		val userCandidate = ratingFile.map{ _.userID }
+		                     .groupBy(x => x)
+		                     .filter{case(x,y) => y.size > 2}
+		                     .map{case(x,y) => x}
+		                     .toList
 
 		//隨機從候選users中挑出testSize個test users
 		val testSize = (0.3 * userCandidate.size).toInt
@@ -118,6 +123,8 @@ object SVD {
 			evaluateCount += 1
 		}
 		println("File name : " + filePath)
+		println("There are " + ratingFile.size + " ratings from " + numUsers + " users on " + numMovies + " movies")
+		println("Number of test cases : " + testData.size)
 		println("Number of factors : " + numFactors)
 		println("MAE = " + "%.3f".format(mae / evaluateCount) )
 		println("RMSE = " + "%.3f".format(math.sqrt(rmse / evaluateCount)) )
@@ -387,7 +394,9 @@ object SVD {
 				step = i
 			}
 		}
+		println
 		println("min error : " + min + " at step " + step)
+		println
 
 	/*
 		var last = math.abs(gradientDescent())
