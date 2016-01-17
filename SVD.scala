@@ -10,7 +10,7 @@ object SVD {
 
 	//set algorithm, number of trainging iteration, 
 	//and number of factors in matrix factorization
-	val (selectAlgorithm, steps, numFactors) = (4, 30, 100)
+	val (selectAlgorithm, steps, numFactors) = (4, 30, 200)
 
 	val (filePath, splitStr) = ("ratingsNetflix.dat", "::") //從Netflix篩選出的小檔案
 	//val (filePath, splitStr) = ("ratings20m.dat", "::") //從MovieLen 20m 篩選出的小檔案
@@ -423,13 +423,27 @@ object SVD {
 		val (beta) = (0.4)
 		val (gamma, lambda) = (0.0002, 0.01)
 
-		//!! how to init
 		val numBins = 30
+		//b_u
 		val userDeviation = Array.fill(numUsers)(Random.nextDouble)
+		//b_u
+		val userDeviationT = Array.fill(numUsers)(collection.mutable.HashMap[Int, Double]())
+		ratingFile.foreach{ x => 
+			val t = days(x.timestamp, minStamp)
+			userDeviationT(x.userID - 1) += (t -> 0.0) 
+		}
+		
+		//b_i
 		val movieDeviation = Array.fill(numMovies)(Random.nextDouble)
+		//b_i-bin(t)
 		val movieDeviationT = Array.fill(numMovies)(Array.fill(numBins)(Random.nextDouble))
+		//alpha_u
 		val alpha = Array.fill(numUsers)(Random.nextDouble)
+		//alpahK_u
 		val alphaK = Array.fill(numUsers)(Array.fill(numFactors)(Random.nextDouble))
+		//p_u(t)
+		val timePreference = Array.fill(numUsers)( Array.fill(numFactors)(collection.mutable.HashMap[Int, Double]()) )
+
 		val ratedMovieOfUsers = ratings.map{ x => 
 			                        val s = x.size 
 			                        for(i <- 0 until s if x(i) > 0.0) 
@@ -444,13 +458,6 @@ object SVD {
 		//For the rating(u)(i) which we want to predict(to test), its timestamp is preserved
 		//另一種可能的作法是都設為現在的時間
 		ratingFile.foreach{ x => times(x.userID - 1)(x.movieID - 1) =  x.timestamp }
-		val userDeviationT = Array.fill(numUsers)(collection.mutable.HashMap[Int, Double]())
-		ratingFile.foreach{ x => 
-			val t = days(x.timestamp, minStamp)
-			userDeviationT(x.userID - 1) += (t -> 0.0) 
-		}
-		//userDeviationT.foreach{println}
-		val timePreference = Array.fill(numUsers)( Array.fill(numFactors)(collection.mutable.HashMap[Int, Double]()) )
 
 		val userMeanDate = Array.tabulate(ratedMovieOfUsers.size) { u =>
 			val sum: Double = ratedMovieOfUsers(u)
@@ -461,8 +468,8 @@ object SVD {
 			else
 				globalMeanDate
 		}
-		//need to fix and the one in SVD++ SVD
-		//val overallAverage = ratingFile.foldLeft(0.0)( (a,b) => a + b.rating) / ratingFile.size
+
+		//mui
 		val overallAverage = {
 			var count = 0
 			var sum = 0.0
@@ -473,7 +480,7 @@ object SVD {
 				}
 			sum / count
 		}	
-		//val globalMeanDate = ratingFile.foldLeft(0.0)( (a,b) => a + days(b.timestamp, minStamp)) / ratingFile.size
+
 		val globalMeanDate = {
 			var count = 0
 			var sum = 0.0
@@ -641,33 +648,26 @@ object SVD {
 
 [Matrix factorization]
 factor = 20
- (1.031, 1.236) 30 steps (46 test cases)
+ (1.101, 1.366) 30 steps 
 
 [SVD]
 factor = 20
- (0.912, 1.120) 30 steps (46 test cases)
+ (1.008, 1.293) 30 steps
 
 [SVD++]
 factor = 10
- (0.877, 1.066) 30 steps (46 test cases)
+ (0.893, 1.092) 30 steps
 factor = 20
- (0.799, 1.044) 30 steps (46 test cases)
+ (0.935, 1.221) 30 steps (46 test cases)
 
-[timeSVD - part] compare to the paper Table2
+[timeSVD] compare to the paper Table2
 factor = 10
- (1.359, 1.781) 20 steps
- (1.125, 1.525) 30 steps
+ (1.172, 1.619) 30 steps
 factor = 20 
- (1.366, 1.772) 20 steps
- (1.344, 1.711) 30 steps
+ (1.466, 1.884) 30 steps
 factor = 50
- (1.331, 1.767) 20 steps
- (1.299, 1.681) 30 steps
+ (1.325, 1.867) 30 steps
 factor = 100
- (1.535, 1.926) 20 steps
- (1.360, 1.688) 30 steps
-facetor = 200
- (1.430, 1.918) 20 steps
- (1.348, 1.769) 30 steps
+ (1.511, 1.875) 30 steps
 
 */		
