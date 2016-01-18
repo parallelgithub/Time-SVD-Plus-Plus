@@ -40,7 +40,13 @@ TimeSVD++ Implementation
 
 ### Input 檔案格式
 
-電影評分scale
+每行為一筆評分資料，格式如下
+
+    user ID | 電影 id | 評分 | timestamp
+
+分隔符號需指定至程式碼中
+
+電影評分範圍為 1.0 stars - 5.0 stars
 
 ## TimeSVD++ 演算法
 
@@ -60,4 +66,4 @@ Number of test cases : 46
 |SVD|1.135|1.245|1.386|1.327|1.267|
 |SVD++|1.150|1.269|1.320|1.459|1.458|
 |timeSVD|1.672|1.544|1.693|1.481|1.725|
-|timeSVD++||||||
+|timeSVD++|1.724|||||
