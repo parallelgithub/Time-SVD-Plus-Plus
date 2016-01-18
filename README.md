@@ -27,14 +27,19 @@ TimeSVD++ Implementation
 ## TimeSVD++ 演算法
 
 ## 執行效能
-RMSE
+
+Measure by root mean squared error (RMSE)
+
 30 iterations
-There are 3692 ratings from 943 users on 1682 movies
+
+3692 ratings from 943 users on 1682 movies at 802 different dates
+
 Number of test cases : 46
+
 |Model|_f_=10|_f_=20|_f_=50|_f_=100|_f_=200|
 |:---|:---:|:---:|:---:|:---:|:---:|
 |Matrix Factorization|1.373|1.370|1.517|1.460|1.586|
-|SVD|1.135|||||
+|SVD|1.135|1.245||||
 |SVD++||||||
 |timeSVD||||||
 |timeSVD++||||||
