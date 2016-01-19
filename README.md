@@ -89,12 +89,13 @@ TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變
 
 * b_u 分為穩定的部分與另外兩個隨時間變化的部分。dev(t)_u 記錄時間平緩的變化(線性變化)，越接近當前、值越大；b_u,t 記錄因時間不同產生的急遽變化部分，比如 user 不同天的評分會受當天心情影響，因此這部份的時間參數以一天為單位。
 
-  > b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
-  > dev(t)_u = sign(t - t_u) * abs(t - t_u)^bata
+ > b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
+ 
+ > dev(t)_u = sign(t - t_u) * abs(t - t_u)^bata
 
 * p_u (user 的偏好) 也用與 b_u 類似的作法參數化
 
-  > p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
+ > p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
 
 * q_i (電影的特性) 不隨時間變化
 
@@ -106,7 +107,7 @@ Measure by root mean squared error (RMSE)
 
 3692 ratings from 943 users on 1682 movies at 802 different dates
 
-Number of test cases : 46
+Number of test users : 46
 
 |Model|_f_=10|_f_=20|_f_=50|_f_=100|_f_=200|
 |:---|:---:|:---:|:---:|:---:|:---:|
@@ -114,4 +115,4 @@ Number of test cases : 46
 |SVD|1.135|1.245|1.386|1.327|1.267|
 |SVD++|1.127|1.034|1.184|1.464|1.617|
 |timeSVD|1.672|1.544|1.693|1.481|1.725|
-|timeSVD++|||||1.642|
+|timeSVD++|1.633|1.621|1.991|1.438|1.763|
