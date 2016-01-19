@@ -34,7 +34,7 @@ TimeSVD++ Implementation
 
 ## 程式說明
 
-讀取電影評分檔案，取 70% 的 user 為 training data，其餘 30% 的 user 取其最近時間的評分作為 test data。
+讀取電影評分檔案，取 70% 的 user 為 training data，其餘 30% 的 user 取其所有評分資料中最近時間的評分作為 test data。
 
 程式中實作了五種 SVD 系列的演算法：純矩陣分解演算法、SVD 演算法、SVD++ 演算法、沒有 implicit feedback 的 time-SVD演算法、與timeSVD++ 演算法。
 
@@ -89,12 +89,12 @@ TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變
 
 * b_u 分為穩定的部分與另外兩個隨時間變化的部分。dev(t)_u 記錄時間平緩的變化(線性變化)，越接近當前、值越大；b_u,t 記錄因時間不同產生的急遽變化部分，比如 user 不同天的評分會受當天心情影響，因此這部份的時間參數以一天為單位。
 
-> b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
-> dev(t)_u = sign(t - t_u) * abs(t - t_u)^bata
+  > b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
+  > dev(t)_u = sign(t - t_u) * abs(t - t_u)^bata
 
 * p_u (user 的偏好) 也用與 b_u 類似的作法參數化
 
-> p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
+    > p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
 
 * q_i (電影的特性) 不隨時間變化
 
