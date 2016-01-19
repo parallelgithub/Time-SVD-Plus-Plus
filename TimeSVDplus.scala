@@ -7,10 +7,12 @@ import java.util.concurrent.TimeUnit
 
 class TimeSVDplus extends TrainingModel {
 
-	//good
-	val (gamma, lambda1, lambda2) = (0.00042, 0.05, 0.05)
-	val beta = 0.3
+	val (gamma, lambda1, lambda2) = (0.00032, 0.05, 0.05)
 	//beta = 0.4 from paper
+	val beta = 0.32
+	//scale
+	def w(value: Double): Double = math.sqrt(value) * 10.0
+
 
 	val numBins = 30
 	//b_u
@@ -83,9 +85,6 @@ class TimeSVDplus extends TrainingModel {
 			}
 		sum / count
 	}	
-
-	//scale
-	def w(value: Double): Double = math.sqrt(value)
 
 	def predict(userIndex: Int, movieIndex: Int) = { 
 		val stamp = times(userIndex)(movieIndex)
@@ -182,7 +181,7 @@ class TimeSVDplus extends TrainingModel {
 		
 		var error = 0.0
 		for(u <- 0 until numUsers; i <- 0 until numMovies){
-			if (ratings(u)(i) > 0){ //??
+			if (ratings(u)(i) > 0){ // prevent overfit
 				val eui = ratings(u)(i) - predict(u,i)
 				error += eui * eui
 
