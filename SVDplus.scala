@@ -10,10 +10,11 @@ import scala.math
 class SVDplus extends TrainingModel {
 
 	val nFB = numMovies 
-	def w(value: Double): Double = value * 1000.0
+	def w(value: Double): Double = math.sqrt(value) 
 
-	val (gamma, lambda1, lambda2) = (0.007, 0.005, 0.015)
-	//(0.007, 0.005, 0.015) "Factorization meets the neighborhood- a multifaceted collaborative filtering model"
+	//Good
+	val (gamma, lambda1, lambda2) = (0.004, 0.02, 0.03)
+	//(0.002, 0.04, 0.04) "Factorization meets the neighborhood- a multifaceted collaborative filtering model"
 
 	val overallAverage = {
 		var count = 0
@@ -73,12 +74,13 @@ class SVDplus extends TrainingModel {
 					matrixQ(f)(i) += gamma * ( eui * (puf + sumFBj(f)) - lambda2 * matrixQ(f)(i))
 					
 					//update yj					
-					for(j <- ratedMovieOfUsers(u))
+					for(j <- ratedMovieOfUsers(u)){
 						feedback(f)(j) += gamma * ( eui * matrixQ(f)(i) / w(ratedMovieOfUsers(u).size) - lambda2 * feedback(f)(j))
-					
+						feedback(f)(j) = if (feedback(f)(j) > 0.5) 1 else 0
+					}
 				}
 			}
-		}
+		} // end of updating
 
 		var error = 0.0
 

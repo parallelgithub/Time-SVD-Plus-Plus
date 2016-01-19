@@ -44,11 +44,42 @@ TimeSVD++ Implementation
 
     user ID | 電影 id | 評分 | timestamp
 
-分隔符號需指定至程式碼中
+分隔符號可為任意字串，但須需指定至程式碼中 parse
 
 電影評分範圍為 1.0 stars - 5.0 stars
 
 ## TimeSVD++ 演算法
+
+每個SVD系列的演算法中需設計三種公式
+1. 訂定 prediction rule
+2. 根據前一步驟訂定 regularized squared error function
+3. 將前一步驟的 function 最小化即可達到所求，因此我們使用 gradient descent scheme 求局部最小值。計算偏微分後得到每個變數的更新公式
+
+矩陣中每個項目為所求的變數，初始值設為隨機亂數，
+執行 training 時程式反覆計算每個變數的更新公式，
+最後得到的結果即為 prediction rule model。
+
+### TimeSVD++ prediction rule
+
+純矩陣分解演算法只求相乘的兩個矩陣 p, q
+  predict(u,i) = p_u * q_i
+
+SVD
+  predict(u,i) = mui + b_u + b_i + p_u * q_i
+
+SVD++演算法在 SVD 上再加上 implicit feedback : y_i
+  predict(u,i) = mui + b_u + b_i + [p_u + sum_y_i / sqrt(N(u))] * q_i
+implicit feedback 的形式可以是購買紀錄、瀏覽紀錄、搜尋行為模式、滑鼠行為模式。在缺乏此類資訊的電影評分資料中，我們取 user 是否有對電影評分的 boolean 資訊(有評分即設1，反之設0)。
+
+TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變數在不同時間時的樣貌
+  predict(u,i)(t) = mui + b(t)_u + b(t)_i + [p(t)_u + sum_y_i / sqrt(N(u))] * q_i
+
+  b_i(t) = b_i + b_i,Bin(t)
+
+  b_u(t) = b_u + alpha_u * dev(t)_u + b_u,t
+  dev(t)_u = sign(t - t_u) * | t - t_u |bata
+
+  p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
 
 ## 執行效能
 
@@ -64,6 +95,6 @@ Number of test cases : 46
 |:---|:---:|:---:|:---:|:---:|:---:|
 |Matrix Factorization|1.373|1.370|1.517|1.460|1.586|
 |SVD|1.135|1.245|1.386|1.327|1.267|
-|SVD++|1.150|1.269|1.320|1.459|1.458|
+|SVD++|1.127|1.034|1.184|1.464|1.617|
 |timeSVD|1.672|1.544|1.693|1.481|1.725|
-|timeSVD++|1.454||||1.558|
+|timeSVD++|1.454|1.840|1.899|1.985|1.558|
