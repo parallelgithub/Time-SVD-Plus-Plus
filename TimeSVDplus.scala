@@ -7,10 +7,10 @@ import java.util.concurrent.TimeUnit
 
 class TimeSVDplus extends TrainingModel {
 
-	val (gamma, lambda1, lambda2) = (0.00007, 0.005, 0.015)
-
-	val (beta) = (0.4)
-	//val (gamma, lambda) = (0.00002, 0.01)
+	//good
+	val (gamma, lambda1, lambda2) = (0.00042, 0.05, 0.05)
+	val beta = 0.3
+	//beta = 0.4 from paper
 
 	val numBins = 30
 	//b_u
@@ -46,6 +46,7 @@ class TimeSVDplus extends TrainingModel {
 
 	val ratedMovieOfUsers = ratings.map{ x => 
 		                        val s = x.size 
+		                        //取有評過分的電影，記錄其 index
 		                        for(i <- 0 until s if x(i) > 0.0) 
 		                        	yield i 
 		                        }
@@ -84,7 +85,7 @@ class TimeSVDplus extends TrainingModel {
 	}	
 
 	//scale
-	def w(value: Double): Double = value * 1000.0
+	def w(value: Double): Double = math.sqrt(value)
 
 	def predict(userIndex: Int, movieIndex: Int) = { 
 		val stamp = times(userIndex)(movieIndex)
@@ -170,8 +171,10 @@ class TimeSVDplus extends TrainingModel {
 					//update p_ku(t)
 					timePreference(u)(k) += (t -> put)
 					//update y_j					
-					for(j <- ratedMovieOfUsers(u))
+					for(j <- ratedMovieOfUsers(u)) {
 						feedback(k)(j) += gamma * ( eui * qi / w(ratedMovieOfUsers(u).size) - lambda2 * feedback(k)(j))
+						feedback(k)(j) = if (feedback(k)(j) > 0.5) 1 else 0
+					}
 
 				}
 			}
