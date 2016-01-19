@@ -69,21 +69,34 @@ TimeSVD++ Implementation
 SVD演算法的 prediction rule 在純矩陣分解上加了 baseline estimates。
 
 > predict(u,i) = mui + b_u + b_i + p_u * q_i
+
 mui為所有評分的平均，b_u為 user u 平均評分與所有評分的偏差，b_i為電影 i 平均評分與所有評分的偏差
 
 SVD++演算法在 SVD 上再加上 implicit feedback : y_i
 > predict(u,i) = mui + b_u + b_i + [p_u + sum_y_i / sqrt(N(u))] * q_i
+
 implicit feedback 的形式可以是購買紀錄、瀏覽紀錄、搜尋行為模式、滑鼠行為模式。在缺乏此類資訊的電影評分資料中，我們取 user 是否有對電影評分的 boolean 資訊(有評分即設1，反之設0)。
 
 TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變數在不同時間時的樣貌
->  predict(u,i)(t) = mui + b(t)_u + b(t)_i + [p(t)_u + sum_y_i / sqrt(N(u))] * q_i
 
->  b(t)_i = b_i + b_i,Bin(t)
+> predict(u,i)(t) = mui + b(t)_u + b(t)_i + [p(t)_u + sum_y_i / sqrt(N(u))] * q_i
 
->  b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
->  dev(t)_u = sign(t - t_u) * | t - t_u |bata
+每個參數化的變數描述如下：
 
-  p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
+* 原本的 b_i 分開為穩定的部分與隨時間變化的部分，由於電影平均偏差變化不大，因此每隔一段時間才記錄偏差變化
+
+> b(t)_i = b_i + b_i,Bin(t)
+
+* b_u 分為穩定的部分與另外兩個隨時間變化的部分。dev(t)_u 記錄時間平緩的變化(線性變化)，越接近當前、值越大；b_u,t 記錄因時間不同產生的急遽變化部分，比如 user 不同天的評分會受當天心情影響，因此這部份的時間參數以一天為單位。
+
+> b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
+> dev(t)_u = sign(t - t_u) * abs(t - t_u)^bata
+
+* p_u (user 的偏好) 也用與 b_u 類似的作法參數化
+
+> p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
+
+* q_i (電影的特性) 不隨時間變化
 
 ## 執行效能
 
@@ -101,4 +114,4 @@ Number of test cases : 46
 |SVD|1.135|1.245|1.386|1.327|1.267|
 |SVD++|1.127|1.034|1.184|1.464|1.617|
 |timeSVD|1.672|1.544|1.693|1.481|1.725|
-|timeSVD++|1.454|1.840|1.899|1.985|1.558|
+|timeSVD++|1.454|1.840|1.899|1.985|1.53|
