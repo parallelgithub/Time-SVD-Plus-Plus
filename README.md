@@ -42,7 +42,7 @@ TimeSVD++ Implementation
 
 每行為一筆評分資料，格式如下
 
-    user ID | 電影 id | 評分 | timestamp
+  user ID | 電影 id | 評分 | timestamp
 
 分隔符號可為任意字串，但須需指定至程式碼中 parse
 
@@ -51,6 +51,7 @@ TimeSVD++ Implementation
 ## TimeSVD++ 演算法
 
 每個SVD系列的演算法中需設計三種公式
+
 1. 訂定 prediction rule
 2. 根據前一步驟訂定 regularized squared error function
 3. 將前一步驟的 function 最小化即可達到所求，因此我們使用 gradient descent scheme 求局部最小值。計算偏微分後得到每個變數的更新公式
@@ -61,22 +62,29 @@ TimeSVD++ Implementation
 
 ### TimeSVD++ prediction rule
 
-純矩陣分解演算法只求相乘的兩個矩陣 p, q
+純矩陣分解演算法的 prediction rule 只求相乘的兩個矩陣 p, q
+
   predict(u,i) = p_u * q_i
 
-SVD
+SVD演算法的 prediction rule 在純矩陣分解上加了 baseline estimates。
+
   predict(u,i) = mui + b_u + b_i + p_u * q_i
 
+mui為所有評分的平均，b_u為 user u 平均評分與所有評分的偏差，b_i為電影 i 平均評分與所有評分的偏差
+
 SVD++演算法在 SVD 上再加上 implicit feedback : y_i
+
   predict(u,i) = mui + b_u + b_i + [p_u + sum_y_i / sqrt(N(u))] * q_i
+
 implicit feedback 的形式可以是購買紀錄、瀏覽紀錄、搜尋行為模式、滑鼠行為模式。在缺乏此類資訊的電影評分資料中，我們取 user 是否有對電影評分的 boolean 資訊(有評分即設1，反之設0)。
 
 TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變數在不同時間時的樣貌
+
   predict(u,i)(t) = mui + b(t)_u + b(t)_i + [p(t)_u + sum_y_i / sqrt(N(u))] * q_i
 
-  b_i(t) = b_i + b_i,Bin(t)
+  b(t)_i = b_i + b_i,Bin(t)
 
-  b_u(t) = b_u + alpha_u * dev(t)_u + b_u,t
+  b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
   dev(t)_u = sign(t - t_u) * | t - t_u |bata
 
   p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
