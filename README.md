@@ -115,9 +115,9 @@ Number of test users : 282
 |:---|:---:|:---:|:---:|:---:|:---:|
 |Matrix Factorization|1.103|1.062|1.316|1.613|1.692|
 |SVD|1.071|1.097|1.210|1.319|1.434|
-|SVD++||||||
-|timeSVD||||||
-|timeSVD++||||||
+|SVD++|1.086|1.113|1.177|||
+|timeSVD|1.346|1.447|1.454|||
+|timeSVD++|1.195|1.279||||
 
 ### 100K Dataset from Netflix
 
@@ -125,7 +125,7 @@ Number of test users : 282
 
 Number of test users : 46
 
-|Model|_f_=10|_f_=20|_f_=50|_f_=100|_f_=200|
+|Model|_f_ = 10|_f_ = 20|_f_ = 50|_f_ = 100|_f_ = 200|
 |:---|:---:|:---:|:---:|:---:|:---:|
 |Matrix Factorization|1.373|1.370|1.517|1.460|1.586|
 |SVD|1.135|1.245|1.386|1.327|1.267|
@@ -133,3 +133,12 @@ Number of test users : 46
 |timeSVD|1.672|1.544|1.693|1.481|1.725|
 |timeSVD++|1.633|1.621|1.991|1.438|1.763|
 
+### 1M Dataset from Netflix
+
+55450 ratings from 6039 users on 3900 movies on 1679 days
+
+Number of test users : 302
+
+|Model|_f_ = 200|
+|:---|:---:|
+|timeSVD++|1.802|
