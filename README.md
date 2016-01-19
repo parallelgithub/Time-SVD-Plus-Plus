@@ -105,7 +105,23 @@ Measure by root mean squared error (RMSE)
 
 30 iterations
 
-3692 ratings from 943 users on 1682 movies at 802 different dates
+### 100K MovieLens Dataset
+
+100000 ratings from 943 users on 1682 movies on 1 day
+
+Number of test users : 282
+
+|Model|_f_=10|_f_=20|_f_=50|_f_=100|_f_=200|
+|:---|:---:|:---:|:---:|:---:|:---:|
+|Matrix Factorization|1.103|1.062|1.316|1.613|1.692|
+|SVD|1.071|1.097|1.210|1.319|1.434|
+|SVD++||||||
+|timeSVD||||||
+|timeSVD++||||||
+
+### 100K Dataset from Netflix
+
+3692 ratings from 943 users on 1682 movies on **802 different days**
 
 Number of test users : 46
 
@@ -116,3 +132,4 @@ Number of test users : 46
 |SVD++|1.127|1.034|1.184|1.464|1.617|
 |timeSVD|1.672|1.544|1.693|1.481|1.725|
 |timeSVD++|1.633|1.621|1.991|1.438|1.763|
+
