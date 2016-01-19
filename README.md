@@ -64,28 +64,24 @@ TimeSVD++ Implementation
 
 純矩陣分解演算法的 prediction rule 只求相乘的兩個矩陣 p, q
 
-  predict(u,i) = p_u * q_i
+> predict(u,i) = p_u * q_i
 
 SVD演算法的 prediction rule 在純矩陣分解上加了 baseline estimates。
 
-  predict(u,i) = mui + b_u + b_i + p_u * q_i
-
+> predict(u,i) = mui + b_u + b_i + p_u * q_i
 mui為所有評分的平均，b_u為 user u 平均評分與所有評分的偏差，b_i為電影 i 平均評分與所有評分的偏差
 
 SVD++演算法在 SVD 上再加上 implicit feedback : y_i
-
-  predict(u,i) = mui + b_u + b_i + [p_u + sum_y_i / sqrt(N(u))] * q_i
-
+> predict(u,i) = mui + b_u + b_i + [p_u + sum_y_i / sqrt(N(u))] * q_i
 implicit feedback 的形式可以是購買紀錄、瀏覽紀錄、搜尋行為模式、滑鼠行為模式。在缺乏此類資訊的電影評分資料中，我們取 user 是否有對電影評分的 boolean 資訊(有評分即設1，反之設0)。
 
 TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變數在不同時間時的樣貌
+>  predict(u,i)(t) = mui + b(t)_u + b(t)_i + [p(t)_u + sum_y_i / sqrt(N(u))] * q_i
 
-  predict(u,i)(t) = mui + b(t)_u + b(t)_i + [p(t)_u + sum_y_i / sqrt(N(u))] * q_i
+>  b(t)_i = b_i + b_i,Bin(t)
 
-  b(t)_i = b_i + b_i,Bin(t)
-
-  b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
-  dev(t)_u = sign(t - t_u) * | t - t_u |bata
+>  b(t)_u = b_u + alpha_u * dev(t)_u + b_u,t
+>  dev(t)_u = sign(t - t_u) * | t - t_u |bata
 
   p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
 
