@@ -62,7 +62,7 @@ TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變
 
 * p_u (user 的偏好) 也用與 b_u 類似的作法參數化
 
- > p(t)_u = p_u + alpha_u * dev(t)_u + p_u,t
+ > p(t)_u = p_u + alpha'_u * dev(t)_u + p_u,t
 
 * q_i (電影的特性) 不隨時間變化
 
