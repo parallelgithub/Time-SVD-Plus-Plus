@@ -15,33 +15,6 @@ TimeSVD++ Implementation
 * TimeSVDplus.scala: timeSVD++ 演算法
 * GenerateData.scala: 從原始Dataset隨機產生較小的Dataset
 
-## Windows 環境執行
-
-1. 將8個程式碼檔案 `Main.scala` `package.scala` `TrainingModel.scala` `MatrixFacotrization.scala` `SVD.scala` `SVDplus.scala` `TimeSVD.scala` `TimeSVDplus.scala` 置於同一資料夾中
-2. 設定`package.scala`程式碼中變數
-  * `selectAlgorithm` : 設定演算法
-    * `1` : Matrix Factorization
-    * `2` : SVD
-    * `3` : SVD++
-    * `4` : timeSVD
-    * `5` : timeSVD++
-  * `steps` : Training iterations
-  * `numFactors` : 矩陣分解的 factors 數量
-  * `filePath` : Dataset檔案位置
-  * `splitStr` : 每筆評分資料的分隔符號
-3. 編譯 `scalac *.scala`
-4. 執行 `scala -cp . Main`
-
-### Input 檔案格式
-
-每行為一筆評分資料，格式如下
-
-  user ID | 電影 id | 評分 | timestamp
-
-分隔符號可為任意字串，但須需指定至程式碼中 parse
-
-電影評分範圍為 1.0 stars - 5.0 stars
-
 ## TimeSVD++ 演算法
 
 每個SVD系列的演算法中需設計三種公式
@@ -100,6 +73,33 @@ TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變
 程式中實作了五種 SVD 系列的演算法：純矩陣分解演算法、SVD 演算法、SVD++ 演算法、沒有 implicit feedback 的 time-SVD演算法、與timeSVD++ 演算法。
 
 變數中的時間維度可用程式語言中內建的資料結構 Map 來處理。本專案使用了 scala 的 HashMap。
+
+## Windows 環境執行
+
+1. 將8個程式碼檔案 `Main.scala` `package.scala` `TrainingModel.scala` `MatrixFacotrization.scala` `SVD.scala` `SVDplus.scala` `TimeSVD.scala` `TimeSVDplus.scala` 置於同一資料夾中
+2. 設定`package.scala`程式碼中變數
+  * `selectAlgorithm` : 設定演算法
+    * `1` : Matrix Factorization
+    * `2` : SVD
+    * `3` : SVD++
+    * `4` : timeSVD
+    * `5` : timeSVD++
+  * `steps` : Training iterations
+  * `numFactors` : 矩陣分解的 factors 數量
+  * `filePath` : Dataset檔案位置
+  * `splitStr` : 每筆評分資料的分隔符號
+3. 編譯 `scalac *.scala`
+4. 執行 `scala -cp . Main`
+
+### Input 檔案格式
+
+每行為一筆評分資料，格式如下
+
+  user ID | 電影 id | 評分 | timestamp
+
+分隔符號可為任意字串，但須需指定至程式碼中 parse
+
+電影評分範圍為 1.0 stars - 5.0 stars
 
 ## 執行效能
 
