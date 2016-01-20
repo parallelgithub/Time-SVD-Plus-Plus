@@ -1,7 +1,7 @@
 TimeSVD++ Implementation
 =============
 
-以 TimeSVD++ 實作 time-aware 電影推薦系統
+實作 Time-aware 電影推薦系統，以 TimeSVD++ 演算法捕捉 user 在不同時間的喜好變化。
 
 ## 檔案說明
 
@@ -31,12 +31,6 @@ TimeSVD++ Implementation
   * `splitStr` : 每筆評分資料的分隔符號
 3. 編譯 `scalac *.scala`
 4. 執行 `scala -cp . Main`
-
-## 程式說明
-
-讀取電影評分檔案，取 70% 的 user 為 training data，其餘 30% 的 user 取其所有評分資料中最近時間的評分作為 test data。
-
-程式中實作了五種 SVD 系列的演算法：純矩陣分解演算法、SVD 演算法、SVD++ 演算法、沒有 implicit feedback 的 time-SVD演算法、與timeSVD++ 演算法。
 
 ### Input 檔案格式
 
@@ -99,6 +93,14 @@ TimeSVD++演算法用時間對 SVD 中的某些變數參數化，以表現出變
 
 * q_i (電影的特性) 不隨時間變化
 
+## 程式說明
+
+讀取電影評分檔案，取 70% 的 user 為 training data，其餘 30% 的 user 取其所有評分資料中最近時間的評分作為 test data。
+
+程式中實作了五種 SVD 系列的演算法：純矩陣分解演算法、SVD 演算法、SVD++ 演算法、沒有 implicit feedback 的 time-SVD演算法、與timeSVD++ 演算法。
+
+變數中的時間維度可用程式語言中內建的資料結構 Map 來處理。本專案使用了 scala 的 HashMap。
+
 ## 執行效能
 
 Measure by root mean squared error (RMSE)
@@ -115,9 +117,9 @@ Number of test users : 282
 |:---|:---:|:---:|:---:|:---:|:---:|
 |Matrix Factorization|1.103|1.062|1.316|1.613|1.692|
 |SVD|1.071|1.097|1.210|1.319|1.434|
-|SVD++|1.086|1.113|1.177|||
-|timeSVD|1.346|1.447|1.454|||
-|timeSVD++|1.195|1.279||||
+|SVD++|1.086|1.113|1.177|N/A|N/A|
+|timeSVD|1.346|1.447|1.454|N/A|N/A|
+|timeSVD++|1.195|1.279|1.394|N/A|N/A|
 
 ### 100K Dataset from Netflix
 
